@@ -705,100 +705,16 @@ function updateTls() {
 </script>
 
 <style scoped>
-.property-panel {
-  position: absolute;
-  right: 0;
-  top: 64px;
-  width: 400px;
-  height: calc(100vh - 64px);
-  background: white;
-  border-left: 1px solid var(--gray-200);
-  display: flex;
-  flex-direction: column;
-  z-index: 100;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.05);
-}
-
-.property-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid var(--gray-200);
-  background: var(--gray-50);
-}
-
-.property-panel__title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--gray-800);
-  margin: 0;
-}
-
-.property-panel__close {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: var(--gray-100);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--gray-600);
-  transition: all 0.2s;
-}
-
-.property-panel__close:hover {
-  background: var(--gray-200);
-  color: var(--gray-800);
-}
-
-.property-panel__content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
+/* 继承 main.css 的深色主题变量 */
 
 .form-group {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-}
-
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--gray-700);
-  margin-bottom: 4px;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s;
-  background: white;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px var(--primary-100);
-}
-
-.form-textarea {
-  min-height: 80px;
-  resize: vertical;
 }
 
 .checkbox-group {
@@ -811,20 +727,21 @@ function updateTls() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: var(--gray-700);
+  font-size: 12px;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
+  accent-color: var(--accent-primary);
 }
 
 .hint {
   display: block;
   font-size: 11px;
-  color: var(--gray-500);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -839,9 +756,9 @@ function updateTls() {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: var(--gray-50);
-  border-radius: 8px;
-  border: 1px solid var(--gray-200);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
   position: relative;
 }
 
@@ -853,79 +770,46 @@ function updateTls() {
 
 .btn-add {
   padding: 8px 12px;
-  font-size: 13px;
-  background: var(--gray-50);
-  border: 1px dashed var(--gray-300);
-  color: var(--gray-600);
-  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-default);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .btn-add:hover {
-  background: var(--primary-50);
-  border-color: var(--primary-300);
-  color: var(--primary-600);
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+  color: var(--accent-light);
 }
 
 .btn-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  background: var(--gray-100);
-  color: var(--gray-500);
+  font-size: 11px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
 }
 
 .btn-icon:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .delete-section {
-  margin-top: 24px;
+  margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid var(--gray-200);
-}
-
-.btn-danger {
-  width: 100%;
-  padding: 12px;
-  background: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-danger:hover {
-  background: #b91c1c;
-}
-
-.property-panel__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  text-align: center;
-  color: var(--gray-500);
-}
-
-.property-panel__empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.property-panel__empty p {
-  font-size: 14px;
+  border-top: 1px solid var(--border-default);
 }
 </style>

@@ -11,18 +11,24 @@
     @keydown="onKeyDown"
     tabindex="0"
   >
-    <!-- 连线工具栏 -->
-    <div class="canvas-toolbar">
-      <div 
-        class="connector-tool"
-        draggable="false"
-        @mousedown="startConnectorDrag"
-        :class="{ 'active': isConnecting }"
-      >
-        <span class="connector-tool__icon">✏️</span>
-        <span class="connector-tool__text">连线画笔</span>
-        <span class="connector-tool__hint">拖拽到节点上 / 从节点连接点拖出</span>
-      </div>
+    <!-- 连线画笔工具 -->
+    <div 
+      class="connector-brush"
+      draggable="false"
+      @mousedown="startConnectorDrag"
+      :class="{ 'active': isConnecting }"
+      @mouseenter="showBrushTooltip = true"
+      @mouseleave="showBrushTooltip = false"
+    >
+      <!-- 铅笔图标 -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+    </div>
+    
+    <!-- 画笔 Tooltip -->
+    <div v-if="showBrushTooltip && !isConnecting" class="brush-tooltip">
+      拖拽到节点上进行连线
     </div>
     
     <!-- 连线提示 -->
@@ -116,6 +122,7 @@ const isHandleDrag = ref(false) // 是否从 handle 拖拽开始
 const connectionCreated = ref(false) // 防止重复创建连线
 const sourceHandleId = ref(null) // 源连接点 ID
 const hoveredHandleId = ref(null) // 悬停的目标连接点 ID
+const showBrushTooltip = ref(false) // 画笔 tooltip 显示状态
 
 // 源节点位置（用于绘制临时连线）
 const sourcePosition = computed(() => {
@@ -146,11 +153,12 @@ const nodeTypes = {
   cronjob: markRaw(BaseNode)
 }
 
-// 默认边选项
+// 默认边选项 - 实线
 const defaultEdgeOptions = {
-  animated: true,
+  animated: false,
   style: {
-    strokeWidth: 2
+    strokeWidth: 2,
+    stroke: '#3b82f6'
   }
 }
 
@@ -837,78 +845,85 @@ defineExpose({
   outline: none;
 }
 
-/* 画布工具栏 */
-.canvas-toolbar {
+/* 连线画笔工具 - 透明背景 */
+.connector-brush {
   position: absolute;
   top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 20px;
   z-index: 10;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: white;
-  padding: 12px 20px;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border: 2px solid var(--gray-200);
-}
-
-/* 连线画笔工具 */
-.connector-tool {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
-  border: 2px dashed var(--primary-300);
-  border-radius: 12px;
+  justify-content: center;
+  background: transparent;
+  border: none;
   cursor: grab;
   user-select: none;
   transition: all 0.2s ease;
+  color: var(--accent-light);
+  opacity: 0.7;
 }
 
-.connector-tool:hover {
-  background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
-  border-color: var(--primary-400);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+.connector-brush svg {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
-.connector-tool:active {
+.connector-brush:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  color: var(--accent-primary);
+}
+
+.connector-brush:hover svg {
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+
+.connector-brush:active {
   cursor: grabbing;
-  transform: scale(0.98);
+  transform: scale(0.95);
 }
 
-.connector-tool.active {
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-  border-style: solid;
-  border-color: var(--primary-600);
+.connector-brush.active {
+  opacity: 1;
+  color: #fde047;
+  animation: brush-pulse 1s ease-in-out infinite;
 }
 
-.connector-tool.active .connector-tool__icon,
-.connector-tool.active .connector-tool__text {
-  color: white;
+@keyframes brush-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
-.connector-tool__icon {
-  font-size: 24px;
+/* 画笔 Tooltip */
+.brush-tooltip {
+  position: absolute;
+  top: 85px;
+  left: 60px;
+  z-index: 11;
+  padding: 6px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: var(--glow-sm), var(--shadow-md);
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease;
 }
 
-.connector-tool__text {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--primary-700);
-}
-
-.connector-tool__hint {
-  font-size: 11px;
-  color: var(--primary-500);
-}
-
-.connector-tool.active .connector-tool__hint {
-  color: var(--primary-100);
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* 连线状态提示 */
@@ -972,21 +987,21 @@ defineExpose({
   transform: scale(1.02);
 }
 
-/* 让 handle 更容易点击和拖拽 */
+/* 节点连接点 - 更小 */
 .vue-flow__handle {
-  width: 16px !important;
-  height: 16px !important;
-  background: var(--primary-500) !important;
-  border: 3px solid white !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--accent-primary) !important;
+  border: 2px solid var(--bg-secondary) !important;
+  box-shadow: 0 0 4px var(--accent-glow) !important;
   cursor: crosshair !important;
   transition: all 0.15s ease !important;
 }
 
 .vue-flow__handle:hover {
-  background: var(--primary-600) !important;
-  transform: scale(1.4) !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5) !important;
+  background: var(--accent-light) !important;
+  transform: scale(1.5) !important;
+  box-shadow: 0 0 8px var(--accent-glow) !important;
 }
 
 @keyframes pulse {

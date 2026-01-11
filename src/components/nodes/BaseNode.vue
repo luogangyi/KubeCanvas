@@ -10,7 +10,9 @@
     <Handle id="right" type="source" :position="Position.Right" />
     
     <div class="k8s-node__header">
-      <div class="k8s-node__icon">{{ icon }}</div>
+      <div class="k8s-node__icon">
+        <img :src="iconUrl" :alt="typeLabel" />
+      </div>
       <div class="k8s-node__title">
         <div class="k8s-node__type">{{ typeLabel }}</div>
         <div class="k8s-node__name">{{ props.data.name }}</div>
@@ -37,6 +39,31 @@ import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { getResourceTypeConfig } from '../../utils/resourceTemplates.js'
 
+// 导入所有 SVG 图标
+import deployIcon from '../../assets/icons/deploy.svg'
+import stsIcon from '../../assets/icons/sts.svg'
+import podIcon from '../../assets/icons/pod.svg'
+import svcIcon from '../../assets/icons/svc.svg'
+import ingIcon from '../../assets/icons/ing.svg'
+import cmIcon from '../../assets/icons/cm.svg'
+import secretIcon from '../../assets/icons/secret.svg'
+import pvcIcon from '../../assets/icons/pvc.svg'
+import jobIcon from '../../assets/icons/job.svg'
+import cronjobIcon from '../../assets/icons/cronjob.svg'
+
+const iconMap = {
+  deploy: deployIcon,
+  sts: stsIcon,
+  pod: podIcon,
+  svc: svcIcon,
+  ing: ingIcon,
+  cm: cmIcon,
+  secret: secretIcon,
+  pvc: pvcIcon,
+  job: jobIcon,
+  cronjob: cronjobIcon
+}
+
 const props = defineProps({
   type: {
     type: String,
@@ -54,7 +81,10 @@ const props = defineProps({
 
 const typeConfig = computed(() => getResourceTypeConfig(props.type))
 
-const icon = computed(() => typeConfig.value?.icon || '📦')
+const iconUrl = computed(() => {
+  const iconName = typeConfig.value?.icon || 'deploy'
+  return iconMap[iconName] || deployIcon
+})
 
 const typeLabel = computed(() => typeConfig.value?.name || props.type)
 
@@ -100,18 +130,19 @@ const displayProperties = computed(() => {
 </script>
 
 <style scoped>
-/* 连接点样式 - 更大更明显 */
+/* 连接点样式 - 发光效果 */
 :deep(.vue-flow__handle) {
   width: 14px;
   height: 14px;
-  background: var(--primary-500);
-  border: 3px solid white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-secondary);
+  box-shadow: var(--glow-sm);
 }
 
 :deep(.vue-flow__handle:hover) {
-  background: var(--primary-600);
+  background: var(--accent-light);
   transform: scale(1.3);
+  box-shadow: var(--glow-md);
 }
 
 :deep(.vue-flow__handle-top) {

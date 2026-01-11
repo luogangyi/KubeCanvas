@@ -1,0 +1,238 @@
+/* 编辑器组件通用深色主题样式 */
+
+/* 行/卡片 */
+.editor-row,
+.env-row,
+.port-row,
+.mount-row,
+.volume-row,
+.rule-row,
+.path-row {
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    margin-bottom: 8px;
+}
+
+/* 字段组 */
+.editor-field,
+.env-field,
+.port-field,
+.mount-field,
+.volume-field,
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 70px;
+}
+
+/* 字段标签 */
+.editor-label,
+.env-label,
+.port-label,
+.mount-label,
+.volume-label,
+.config-label,
+.param-label,
+.path-label,
+.rule-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* 字段行布局 */
+.editor-fields,
+.env-fields,
+.port-fields,
+.mount-fields {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* 添加按钮 */
+.btn-add,
+.btn-add-small {
+    padding: 8px 12px;
+    font-size: 12px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border-default);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    width: 100%;
+    text-align: center;
+}
+
+.btn-add:hover,
+.btn-add-small:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-primary);
+    color: var(--accent-light);
+}
+
+.btn-add-small {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+/* 删除按钮 */
+.btn-icon,
+.btn-remove,
+.btn-remove-small {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.btn-icon:hover,
+.btn-remove:hover,
+.btn-remove-small:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.btn-remove-small {
+    width: 22px;
+    height: 22px;
+    font-size: 9px;
+}
+
+/* 提示文字 */
+.hint {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+/* 资源编辑器特定 */
+.resource-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.resource-section {
+    padding: 10px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+}
+
+.resource-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+/* 探针编辑器 */
+.probe-config,
+.probe-params {
+    padding: 10px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+}
+
+.param-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+/* 容器编辑器 */
+.container-card {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--bg-secondary);
+    margin-bottom: 12px;
+}
+
+.container-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, var(--accent-dim), var(--bg-tertiary));
+    border-bottom: 1px solid var(--border-default);
+}
+
+.container-index {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-light);
+    background: var(--bg-secondary);
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.container-body {
+    padding: 10px;
+}
+
+/* 探针标签页 */
+.probe-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.probe-tab {
+    flex: 1;
+    padding: 7px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid var(--border-default);
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.probe-tab:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+.probe-tab.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.probe-content {
+    padding: 10px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+/* 表单网格 */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.form-grid .full-width {
+    grid-column: 1 / -1;
+}

@@ -462,15 +462,15 @@ export const resourceTypes = [
         type: 'deployment',
         name: 'Deployment',
         description: '无状态应用部署',
-        icon: '🚀',
-        color: '#2563eb',
+        icon: 'deploy',
+        color: '#3b82f6',
         category: 'workloads'
     },
     {
         type: 'statefulset',
         name: 'StatefulSet',
         description: '有状态应用部署',
-        icon: '📦',
+        icon: 'sts',
         color: '#a855f7',
         category: 'workloads'
     },
@@ -478,55 +478,15 @@ export const resourceTypes = [
         type: 'pod',
         name: 'Pod',
         description: '单个容器组',
-        icon: '🔷',
+        icon: 'pod',
         color: '#0891b2',
         category: 'workloads'
-    },
-    {
-        type: 'service',
-        name: 'Service',
-        description: '服务发现与负载均衡',
-        icon: '🔗',
-        color: '#16a34a',
-        category: 'networking'
-    },
-    {
-        type: 'ingress',
-        name: 'Ingress',
-        description: 'HTTP/HTTPS 路由',
-        icon: '🌐',
-        color: '#ea580c',
-        category: 'networking'
-    },
-    {
-        type: 'configmap',
-        name: 'ConfigMap',
-        description: '配置数据',
-        icon: '⚙️',
-        color: '#d97706',
-        category: 'config'
-    },
-    {
-        type: 'secret',
-        name: 'Secret',
-        description: '敏感数据',
-        icon: '🔐',
-        color: '#dc2626',
-        category: 'config'
-    },
-    {
-        type: 'pvc',
-        name: 'PVC',
-        description: '持久化存储',
-        icon: '💾',
-        color: '#4f46e5',
-        category: 'storage'
     },
     {
         type: 'job',
         name: 'Job',
         description: '一次性任务',
-        icon: '⚡',
+        icon: 'job',
         color: '#059669',
         category: 'workloads'
     },
@@ -534,9 +494,49 @@ export const resourceTypes = [
         type: 'cronjob',
         name: 'CronJob',
         description: '定时任务',
-        icon: '⏰',
+        icon: 'cronjob',
         color: '#db2777',
         category: 'workloads'
+    },
+    {
+        type: 'service',
+        name: 'Service',
+        description: '服务发现与负载均衡',
+        icon: 'svc',
+        color: '#16a34a',
+        category: 'networking'
+    },
+    {
+        type: 'ingress',
+        name: 'Ingress',
+        description: 'HTTP/HTTPS 路由',
+        icon: 'ing',
+        color: '#ea580c',
+        category: 'networking'
+    },
+    {
+        type: 'configmap',
+        name: 'ConfigMap',
+        description: '配置数据',
+        icon: 'cm',
+        color: '#d97706',
+        category: 'config'
+    },
+    {
+        type: 'secret',
+        name: 'Secret',
+        description: '敏感数据',
+        icon: 'secret',
+        color: '#dc2626',
+        category: 'config'
+    },
+    {
+        type: 'pvc',
+        name: 'PVC',
+        description: '持久化存储',
+        icon: 'pvc',
+        color: '#4f46e5',
+        category: 'storage'
     }
 ]
 

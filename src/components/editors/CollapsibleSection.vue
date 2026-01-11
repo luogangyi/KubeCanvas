@@ -40,10 +40,11 @@ function toggle() {
 
 <style scoped>
 .collapsible-section {
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: 8px;
+  background: var(--bg-secondary);
 }
 
 .section-header {
@@ -51,41 +52,41 @@ function toggle() {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: var(--gray-50);
+  background: var(--bg-tertiary);
   cursor: pointer;
   user-select: none;
-  transition: background 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .section-header:hover {
-  background: var(--gray-100);
+  background: var(--bg-elevated);
 }
 
 .section-icon {
-  font-size: 10px;
-  color: var(--gray-500);
+  font-size: 9px;
+  color: var(--text-muted);
   width: 12px;
 }
 
 .section-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--gray-700);
+  color: var(--text-primary);
   flex: 1;
 }
 
 .section-badge {
-  font-size: 11px;
+  font-size: 10px;
   padding: 2px 6px;
-  background: var(--primary-100);
-  color: var(--primary-700);
+  background: var(--accent-dim);
+  color: var(--accent-light);
   border-radius: 10px;
   font-weight: 500;
 }
 
 .section-content {
   padding: 12px;
-  border-top: 1px solid var(--gray-200);
+  border-top: 1px solid var(--border-default);
 }
 
 .collapse-enter-active,

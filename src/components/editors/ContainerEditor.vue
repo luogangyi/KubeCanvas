@@ -251,47 +251,50 @@ function emitChange() {
 .container-editor {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .container-card {
-  border: 2px solid var(--gray-200);
-  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: white;
+  background: var(--bg-secondary);
 }
 
 .container-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px;
-  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
-  border-bottom: 1px solid var(--gray-200);
+  padding: 10px;
+  background: linear-gradient(135deg, var(--accent-dim), var(--bg-tertiary));
+  border-bottom: 1px solid var(--border-default);
 }
 
 .container-index {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--primary-600);
-  background: white;
-  padding: 4px 8px;
-  border-radius: 6px;
+  color: var(--accent-light);
+  background: var(--bg-primary);
+  padding: 3px 6px;
+  border-radius: 4px;
 }
 
 .container-name-input {
   flex: 1;
   font-weight: 600;
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
 }
 
 .container-body {
-  padding: 12px;
+  padding: 10px;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .form-group {
@@ -307,77 +310,79 @@ function emitChange() {
 .probe-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .probe-tab {
   flex: 1;
-  padding: 8px;
-  font-size: 12px;
+  padding: 7px;
+  font-size: 11px;
   font-weight: 500;
-  border: 1px solid var(--gray-200);
-  background: var(--gray-50);
-  color: var(--gray-600);
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .probe-tab:hover {
-  background: var(--gray-100);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
 }
 
 .probe-tab.active {
-  background: var(--primary-500);
-  border-color: var(--primary-500);
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
   color: white;
 }
 
 .probe-content {
-  padding: 12px;
-  background: var(--gray-50);
-  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
 }
 
 .btn-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  transition: all 0.2s;
+  font-size: 11px;
+  transition: all var(--transition-fast);
 }
 
 .btn-remove {
-  background: white;
-  color: var(--gray-500);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
 }
 
 .btn-remove:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .btn-add-container {
-  padding: 12px;
-  font-size: 14px;
+  padding: 10px;
+  font-size: 12px;
   font-weight: 500;
-  background: var(--gray-50);
-  border: 2px dashed var(--gray-300);
-  color: var(--gray-600);
-  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-default);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .btn-add-container:hover {
-  background: var(--primary-50);
-  border-color: var(--primary-300);
-  color: var(--primary-600);
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+  color: var(--accent-light);
 }
 </style>
