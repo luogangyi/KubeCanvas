@@ -7,18 +7,17 @@
       <button class="property-panel__close" @click="$emit('close')">✕</button>
     </div>
     
-    <div class="property-panel__content">
-      <template v-if="selectedNode">
-        <!-- 基本信息 -->
-        <div class="section-title">基本信息</div>
-        
+    <div class="property-panel__content" v-if="selectedNode">
+      <!-- 通用元数据 -->
+      <CollapsibleSection title="📋 元数据 (Metadata)" :defaultExpanded="true">
         <div class="form-group">
-          <label class="form-label">名称</label>
+          <label class="form-label">名称 *</label>
           <input
             type="text"
             class="form-input"
             v-model="localData.name"
-            @input="updateName"
+            @input="emitUpdate('name', localData.name)"
+            placeholder="my-resource"
           />
         </div>
         
@@ -28,277 +27,500 @@
             type="text"
             class="form-input"
             v-model="localData.namespace"
-            @input="updateNamespace"
+            @input="emitUpdate('namespace', localData.namespace)"
           />
         </div>
         
-        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Labels</label>
+          <KeyValueEditor 
+            v-model="localData.labels" 
+            @update:modelValue="v => emitUpdate('labels', v)" 
+          />
+        </div>
         
-        <!-- Deployment/StatefulSet 特有属性 -->
-        <template v-if="['deployment', 'statefulset'].includes(nodeType)">
-          <div class="section-title">容器配置</div>
-          
-          <div class="form-group">
-            <label class="form-label">副本数</label>
-            <input
-              type="number"
-              class="form-input"
-              min="1"
-              v-model.number="localData.replicas"
-              @input="updateReplicas"
-            />
+        <div class="form-group">
+          <label class="form-label">Annotations</label>
+          <KeyValueEditor 
+            v-model="localData.annotations" 
+            @update:modelValue="v => emitUpdate('annotations', v)" 
+          />
+        </div>
+      </CollapsibleSection>
+      
+      <!-- Deployment 特有属性 -->
+      <template v-if="nodeType === 'deployment'">
+        <CollapsibleSection title="🚀 Deployment 配置" :defaultExpanded="true">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">副本数</label>
+              <input
+                type="number"
+                class="form-input"
+                min="0"
+                v-model.number="localData.replicas"
+                @input="emitUpdate('replicas', localData.replicas)"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">更新策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.strategyType"
+                @change="emitUpdate('strategyType', localData.strategyType)"
+              >
+                <option value="RollingUpdate">RollingUpdate</option>
+                <option value="Recreate">Recreate</option>
+              </select>
+            </div>
           </div>
-          
-          <div class="form-group">
-            <label class="form-label">镜像</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="nginx:latest"
-              v-model="localData.image"
-              @input="updateImage"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">容器端口</label>
-            <input
-              type="number"
-              class="form-input"
-              v-model.number="localData.containerPort"
-              @input="updateContainerPort"
-            />
-          </div>
-        </template>
+        </CollapsibleSection>
         
-        <!-- Service 特有属性 -->
-        <template v-if="nodeType === 'service'">
-          <div class="section-title">服务配置</div>
+        <CollapsibleSection title="📦 Pod 配置">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">重启策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.restartPolicy"
+                @change="emitUpdate('restartPolicy', localData.restartPolicy)"
+              >
+                <option value="Always">Always</option>
+                <option value="OnFailure">OnFailure</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+                placeholder="default"
+              />
+            </div>
+          </div>
           
+          <div class="form-group">
+            <label class="form-label">Node Selector</label>
+            <KeyValueEditor 
+              v-model="localData.nodeSelector" 
+              @update:modelValue="v => emitUpdate('nodeSelector', v)" 
+            />
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- StatefulSet 特有属性 -->
+      <template v-if="nodeType === 'statefulset'">
+        <CollapsibleSection title="📦 StatefulSet 配置" :defaultExpanded="true">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">副本数</label>
+              <input
+                type="number"
+                class="form-input"
+                min="0"
+                v-model.number="localData.replicas"
+                @input="emitUpdate('replicas', localData.replicas)"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Service 名称 *</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceName"
+                @input="emitUpdate('serviceName', localData.serviceName)"
+                placeholder="headless-svc"
+              />
+            </div>
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="📦 Pod 配置">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">重启策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.restartPolicy"
+                @change="emitUpdate('restartPolicy', localData.restartPolicy)"
+              >
+                <option value="Always">Always</option>
+                <option value="OnFailure">OnFailure</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+              />
+            </div>
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- Pod 特有属性 -->
+      <template v-if="nodeType === 'pod'">
+        <CollapsibleSection title="📦 Pod 配置" :defaultExpanded="true">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">重启策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.restartPolicy"
+                @change="emitUpdate('restartPolicy', localData.restartPolicy)"
+              >
+                <option value="Always">Always</option>
+                <option value="OnFailure">OnFailure</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+              />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Node Selector</label>
+            <KeyValueEditor 
+              v-model="localData.nodeSelector" 
+              @update:modelValue="v => emitUpdate('nodeSelector', v)" 
+            />
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- Service 特有属性 -->
+      <template v-if="nodeType === 'service'">
+        <CollapsibleSection title="🔗 Service 配置" :defaultExpanded="true">
           <div class="form-group">
             <label class="form-label">类型</label>
-            <select class="form-select" v-model="localData.serviceType" @change="updateServiceType">
+            <select 
+              class="form-select" 
+              v-model="localData.serviceType"
+              @change="emitUpdate('serviceType', localData.serviceType)"
+            >
               <option value="ClusterIP">ClusterIP</option>
               <option value="NodePort">NodePort</option>
               <option value="LoadBalancer">LoadBalancer</option>
+              <option value="ExternalName">ExternalName</option>
             </select>
           </div>
           
-          <div class="form-group">
-            <label class="form-label">端口</label>
+          <div class="form-group" v-if="localData.serviceType === 'ExternalName'">
+            <label class="form-label">External Name</label>
             <input
-              type="number"
+              type="text"
               class="form-input"
-              v-model.number="localData.port"
-              @input="updatePort"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">目标端口</label>
-            <input
-              type="number"
-              class="form-input"
-              v-model.number="localData.targetPort"
-              @input="updateTargetPort"
-            />
-          </div>
-          
-          <div class="form-group" v-if="localData.serviceType === 'NodePort'">
-            <label class="form-label">NodePort (30000-32767)</label>
-            <input
-              type="number"
-              class="form-input"
-              min="30000"
-              max="32767"
-              v-model.number="localData.nodePort"
-              @input="updateNodePort"
+              v-model="localData.externalName"
+              @input="emitUpdate('externalName', localData.externalName)"
+              placeholder="my.database.example.com"
             />
           </div>
           
           <div class="form-group">
             <label class="form-label">Selector</label>
-            <textarea
-              class="form-textarea"
-              v-model="localData.selectorText"
-              @input="updateSelector"
-              placeholder="app: my-app"
-            ></textarea>
-            <small style="color: var(--gray-500);">YAML 格式的标签选择器</small>
+            <KeyValueEditor 
+              v-model="localData.selector" 
+              @update:modelValue="v => emitUpdate('selector', v)" 
+            />
           </div>
-        </template>
+        </CollapsibleSection>
         
-        <!-- Pod 特有属性 -->
-        <template v-if="nodeType === 'pod'">
-          <div class="section-title">容器配置</div>
-          
+        <CollapsibleSection title="🔌 端口配置" :defaultExpanded="true">
+          <ServicePortEditor 
+            v-model="localData.ports" 
+            :showNodePort="localData.serviceType === 'NodePort' || localData.serviceType === 'LoadBalancer'"
+            @update:modelValue="v => emitUpdate('ports', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- Ingress 特有属性 -->
+      <template v-if="nodeType === 'ingress'">
+        <CollapsibleSection title="🌐 Ingress 配置" :defaultExpanded="true">
           <div class="form-group">
-            <label class="form-label">镜像</label>
+            <label class="form-label">Ingress Class</label>
             <input
               type="text"
               class="form-input"
-              v-model="localData.image"
-              @input="updateImage"
+              v-model="localData.ingressClassName"
+              @input="emitUpdate('ingressClassName', localData.ingressClassName)"
+              placeholder="nginx"
             />
           </div>
-          
-          <div class="form-group">
-            <label class="form-label">容器端口</label>
-            <input
-              type="number"
-              class="form-input"
-              v-model.number="localData.containerPort"
-              @input="updateContainerPort"
-            />
-          </div>
-        </template>
+        </CollapsibleSection>
         
-        <!-- Ingress 特有属性 -->
-        <template v-if="nodeType === 'ingress'">
-          <div class="section-title">路由配置</div>
-          
-          <div class="form-group">
-            <label class="form-label">主机名</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="example.com"
-              v-model="localData.host"
-              @input="updateHost"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">路径</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="/"
-              v-model="localData.path"
-              @input="updatePath"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">后端服务名</label>
-            <input
-              type="text"
-              class="form-input"
-              v-model="localData.serviceName"
-              @input="updateServiceName"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">后端服务端口</label>
-            <input
-              type="number"
-              class="form-input"
-              v-model.number="localData.servicePort"
-              @input="updateServicePort"
-            />
-          </div>
-        </template>
+        <CollapsibleSection title="📍 路由规则" :defaultExpanded="true">
+          <IngressRuleEditor 
+            v-model="localData.rules" 
+            @update:modelValue="v => emitUpdate('rules', v)" 
+          />
+        </CollapsibleSection>
         
-        <!-- ConfigMap 特有属性 -->
-        <template v-if="nodeType === 'configmap'">
-          <div class="section-title">配置数据</div>
-          
-          <div class="form-group">
-            <label class="form-label">数据 (YAML 格式)</label>
-            <textarea
-              class="form-textarea"
-              style="min-height: 200px"
-              v-model="localData.configData"
-              @input="updateConfigData"
-              placeholder="key1: value1&#10;key2: value2"
-            ></textarea>
+        <CollapsibleSection title="🔐 TLS 配置">
+          <div class="tls-list">
+            <div v-for="(tls, index) in localData.tls" :key="index" class="tls-item">
+              <div class="form-group">
+                <label class="form-label">Hosts (每行一个)</label>
+                <textarea
+                  class="form-textarea"
+                  v-model="tls.hostsText"
+                  @input="updateTls"
+                  rows="2"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Secret Name</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  v-model="tls.secretName"
+                  @input="updateTls"
+                />
+              </div>
+              <button class="btn-icon btn-remove" @click="removeTls(index)">✕</button>
+            </div>
+            <button class="btn btn-add" @click="addTls">+ 添加 TLS</button>
           </div>
-        </template>
-        
-        <!-- Secret 特有属性 -->
-        <template v-if="nodeType === 'secret'">
-          <div class="section-title">密钥配置</div>
-          
+        </CollapsibleSection>
+      </template>
+      
+      <!-- ConfigMap 特有属性 -->
+      <template v-if="nodeType === 'configmap'">
+        <CollapsibleSection title="⚙️ 配置数据" :defaultExpanded="true">
+          <KeyValueEditor 
+            v-model="localData.configData" 
+            @update:modelValue="v => emitUpdate('configData', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- Secret 特有属性 -->
+      <template v-if="nodeType === 'secret'">
+        <CollapsibleSection title="🔐 Secret 配置" :defaultExpanded="true">
           <div class="form-group">
             <label class="form-label">类型</label>
-            <select class="form-select" v-model="localData.secretType" @change="updateSecretType">
+            <select 
+              class="form-select" 
+              v-model="localData.secretType"
+              @change="emitUpdate('secretType', localData.secretType)"
+            >
               <option value="Opaque">Opaque</option>
-              <option value="kubernetes.io/dockerconfigjson">Docker Config</option>
               <option value="kubernetes.io/tls">TLS</option>
+              <option value="kubernetes.io/dockerconfigjson">Docker Config</option>
+              <option value="kubernetes.io/basic-auth">Basic Auth</option>
+              <option value="kubernetes.io/ssh-auth">SSH Auth</option>
             </select>
           </div>
           
           <div class="form-group">
-            <label class="form-label">数据 (YAML 格式)</label>
-            <textarea
-              class="form-textarea"
-              style="min-height: 150px"
-              v-model="localData.secretData"
-              @input="updateSecretData"
-              placeholder="username: admin&#10;password: secret"
-            ></textarea>
+            <label class="form-label">数据 (值会自动 Base64 编码)</label>
+            <KeyValueEditor 
+              v-model="localData.secretData" 
+              @update:modelValue="v => emitUpdate('secretData', v)" 
+            />
           </div>
-        </template>
-        
-        <!-- PVC 特有属性 -->
-        <template v-if="nodeType === 'pvc'">
-          <div class="section-title">存储配置</div>
-          
+        </CollapsibleSection>
+      </template>
+      
+      <!-- PVC 特有属性 -->
+      <template v-if="nodeType === 'pvc'">
+        <CollapsibleSection title="💾 PVC 配置" :defaultExpanded="true">
           <div class="form-group">
             <label class="form-label">存储大小</label>
             <input
               type="text"
               class="form-input"
-              placeholder="1Gi"
               v-model="localData.storage"
-              @input="updateStorage"
+              @input="emitUpdate('storage', localData.storage)"
+              placeholder="10Gi"
             />
           </div>
           
           <div class="form-group">
             <label class="form-label">访问模式</label>
-            <select class="form-select" v-model="localData.accessMode" @change="updateAccessMode">
-              <option value="ReadWriteOnce">ReadWriteOnce</option>
-              <option value="ReadOnlyMany">ReadOnlyMany</option>
-              <option value="ReadWriteMany">ReadWriteMany</option>
-            </select>
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="localData.accessModes" 
+                  value="ReadWriteOnce"
+                  @change="emitUpdate('accessModes', localData.accessModes)"
+                />
+                ReadWriteOnce
+              </label>
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="localData.accessModes" 
+                  value="ReadOnlyMany"
+                  @change="emitUpdate('accessModes', localData.accessModes)"
+                />
+                ReadOnlyMany
+              </label>
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="localData.accessModes" 
+                  value="ReadWriteMany"
+                  @change="emitUpdate('accessModes', localData.accessModes)"
+                />
+                ReadWriteMany
+              </label>
+            </div>
           </div>
           
           <div class="form-group">
-            <label class="form-label">存储类 (可选)</label>
+            <label class="form-label">存储类</label>
             <input
               type="text"
               class="form-input"
               v-model="localData.storageClassName"
-              @input="updateStorageClass"
+              @input="emitUpdate('storageClassName', localData.storageClassName)"
+              placeholder="留空使用默认"
             />
           </div>
-        </template>
+        </CollapsibleSection>
+      </template>
+      
+      <!-- Job 特有属性 -->
+      <template v-if="nodeType === 'job'">
+        <CollapsibleSection title="⚡ Job 配置" :defaultExpanded="true">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">完成次数</label>
+              <input
+                type="number"
+                class="form-input"
+                min="1"
+                v-model.number="localData.completions"
+                @input="emitUpdate('completions', localData.completions)"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">并行数</label>
+              <input
+                type="number"
+                class="form-input"
+                min="1"
+                v-model.number="localData.parallelism"
+                @input="emitUpdate('parallelism', localData.parallelism)"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">重试次数</label>
+            <input
+              type="number"
+              class="form-input"
+              min="0"
+              v-model.number="localData.backoffLimit"
+              @input="emitUpdate('backoffLimit', localData.backoffLimit)"
+            />
+          </div>
+        </CollapsibleSection>
         
-        <!-- Job 特有属性 -->
-        <template v-if="nodeType === 'job'">
-          <div class="section-title">任务配置</div>
-          
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
+      <!-- CronJob 特有属性 -->
+      <template v-if="nodeType === 'cronjob'">
+        <CollapsibleSection title="⏰ CronJob 配置" :defaultExpanded="true">
           <div class="form-group">
-            <label class="form-label">镜像</label>
+            <label class="form-label">调度表达式 (Cron)</label>
             <input
               type="text"
               class="form-input"
-              v-model="localData.image"
-              @input="updateImage"
+              v-model="localData.schedule"
+              @input="emitUpdate('schedule', localData.schedule)"
+              placeholder="*/5 * * * *"
             />
+            <small class="hint">分 时 日 月 周 (如: */5 * * * * 每5分钟)</small>
           </div>
           
           <div class="form-group">
-            <label class="form-label">命令</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="echo Hello"
-              v-model="localData.command"
-              @input="updateCommand"
-            />
+            <label class="form-label">并发策略</label>
+            <select 
+              class="form-select" 
+              v-model="localData.concurrencyPolicy"
+              @change="emitUpdate('concurrencyPolicy', localData.concurrencyPolicy)"
+            >
+              <option value="Allow">Allow</option>
+              <option value="Forbid">Forbid</option>
+              <option value="Replace">Replace</option>
+            </select>
           </div>
           
           <div class="form-group">
@@ -308,68 +530,52 @@
               class="form-input"
               min="0"
               v-model.number="localData.backoffLimit"
-              @input="updateBackoffLimit"
+              @input="emitUpdate('backoffLimit', localData.backoffLimit)"
             />
           </div>
-        </template>
+        </CollapsibleSection>
         
-        <!-- CronJob 特有属性 -->
-        <template v-if="nodeType === 'cronjob'">
-          <div class="section-title">定时任务配置</div>
-          
-          <div class="form-group">
-            <label class="form-label">调度 (Cron 表达式)</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="*/5 * * * *"
-              v-model="localData.schedule"
-              @input="updateSchedule"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">镜像</label>
-            <input
-              type="text"
-              class="form-input"
-              v-model="localData.image"
-              @input="updateImage"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">命令</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="echo Hello"
-              v-model="localData.command"
-              @input="updateCommand"
-            />
-          </div>
-        </template>
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
         
-        <div class="divider"></div>
-        
-        <!-- 删除按钮 -->
-        <button class="btn btn-danger" style="width: 100%" @click="$emit('delete')">
-          删除资源
-        </button>
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
       </template>
       
-      <template v-else>
-        <div class="property-panel__empty">
-          <div class="property-panel__empty-icon">📋</div>
-          <p>选择一个节点以编辑其属性</p>
-        </div>
-      </template>
+      <!-- 删除按钮 -->
+      <div class="delete-section">
+        <button class="btn btn-danger" @click="$emit('delete')">
+          🗑️ 删除资源
+        </button>
+      </div>
+    </div>
+    
+    <div class="property-panel__content" v-else>
+      <div class="property-panel__empty">
+        <div class="property-panel__empty-icon">📋</div>
+        <p>选择一个节点以编辑其属性</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import CollapsibleSection from './editors/CollapsibleSection.vue'
+import KeyValueEditor from './editors/KeyValueEditor.vue'
+import ContainerEditor from './editors/ContainerEditor.vue'
+import VolumeEditor from './editors/VolumeEditor.vue'
+import ServicePortEditor from './editors/ServicePortEditor.vue'
+import IngressRuleEditor from './editors/IngressRuleEditor.vue'
 
 const props = defineProps({
   selectedNode: {
@@ -386,82 +592,340 @@ const emit = defineEmits(['update', 'close', 'delete'])
 
 const nodeType = computed(() => props.selectedNode?.type || '')
 
-// 本地数据
 const localData = ref({})
 
-// 监听选中节点变化，初始化本地数据
-watch(() => props.selectedNode, (node) => {
-  if (node) {
-    const resource = node.data?.resource || {}
-    localData.value = {
-      name: node.data?.name || '',
-      namespace: resource.metadata?.namespace || 'default',
-      // Deployment/StatefulSet
-      replicas: resource.spec?.replicas || 1,
-      image: resource.spec?.template?.spec?.containers?.[0]?.image || 
-             resource.spec?.containers?.[0]?.image || 
-             resource.spec?.jobTemplate?.spec?.template?.spec?.containers?.[0]?.image || 'nginx:latest',
-      containerPort: resource.spec?.template?.spec?.containers?.[0]?.ports?.[0]?.containerPort || 
-                     resource.spec?.containers?.[0]?.ports?.[0]?.containerPort || 80,
-      // Service
-      serviceType: resource.spec?.type || 'ClusterIP',
-      port: resource.spec?.ports?.[0]?.port || 80,
-      targetPort: resource.spec?.ports?.[0]?.targetPort || 80,
-      nodePort: resource.spec?.ports?.[0]?.nodePort || 30000,
-      selectorText: resource.spec?.selector ? 
-        Object.entries(resource.spec.selector).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
-      // Ingress
-      host: resource.spec?.rules?.[0]?.host || '',
-      path: resource.spec?.rules?.[0]?.http?.paths?.[0]?.path || '/',
-      serviceName: resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service?.name || '',
-      servicePort: resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service?.port?.number || 80,
-      // ConfigMap
-      configData: resource.data ? 
-        Object.entries(resource.data).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
-      // Secret
-      secretType: resource.type || 'Opaque',
-      secretData: resource.stringData ? 
-        Object.entries(resource.stringData).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
-      // PVC
-      storage: resource.spec?.resources?.requests?.storage || '1Gi',
-      accessMode: resource.spec?.accessModes?.[0] || 'ReadWriteOnce',
-      storageClassName: resource.spec?.storageClassName || '',
-      // Job
-      backoffLimit: resource.spec?.backoffLimit || 4,
-      // CronJob
-      schedule: resource.spec?.schedule || '*/5 * * * *',
-      command: resource.spec?.template?.spec?.containers?.[0]?.command?.join(' ') ||
-               resource.spec?.jobTemplate?.spec?.template?.spec?.containers?.[0]?.command?.join(' ') || ''
-    }
+// 从 K8s 资源提取编辑数据
+function extractData(node) {
+  if (!node) return {}
+  
+  const resource = node.data?.resource || {}
+  const spec = resource.spec || {}
+  const metadata = resource.metadata || {}
+  
+  // 获取容器配置
+  const getContainers = () => {
+    if (spec.template?.spec?.containers) return spec.template.spec.containers
+    if (spec.containers) return spec.containers
+    if (spec.jobTemplate?.spec?.template?.spec?.containers) return spec.jobTemplate.spec.template.spec.containers
+    return []
   }
-}, { immediate: true })
+  
+  // 获取 Pod spec
+  const getPodSpec = () => {
+    if (spec.template?.spec) return spec.template.spec
+    if (spec.jobTemplate?.spec?.template?.spec) return spec.jobTemplate.spec.template.spec
+    return spec
+  }
+  
+  const podSpec = getPodSpec()
+  
+  return {
+    // 通用元数据
+    name: node.data?.name || metadata.name || '',
+    namespace: metadata.namespace || 'default',
+    labels: metadata.labels || {},
+    annotations: metadata.annotations || {},
+    
+    // Deployment/StatefulSet
+    replicas: spec.replicas || 1,
+    strategyType: spec.strategy?.type || 'RollingUpdate',
+    serviceName: spec.serviceName || '',
+    
+    // Pod 配置  
+    restartPolicy: podSpec.restartPolicy || 'Always',
+    serviceAccountName: podSpec.serviceAccountName || '',
+    nodeSelector: podSpec.nodeSelector || {},
+    volumes: podSpec.volumes || [],
+    containers: getContainers(),
+    
+    // Service
+    serviceType: spec.type || 'ClusterIP',
+    selector: spec.selector || {},
+    ports: spec.ports || [],
+    externalName: spec.externalName || '',
+    
+    // Ingress
+    ingressClassName: spec.ingressClassName || '',
+    rules: spec.rules || [],
+    tls: (spec.tls || []).map(t => ({
+      hostsText: (t.hosts || []).join('\n'),
+      secretName: t.secretName || ''
+    })),
+    
+    // ConfigMap
+    configData: resource.data || {},
+    
+    // Secret
+    secretType: resource.type || 'Opaque',
+    secretData: resource.stringData || {},
+    
+    // PVC
+    storage: spec.resources?.requests?.storage || '1Gi',
+    accessModes: spec.accessModes || ['ReadWriteOnce'],
+    storageClassName: spec.storageClassName || '',
+    
+    // Job
+    completions: spec.completions || 1,
+    parallelism: spec.parallelism || 1,
+    backoffLimit: spec.backoffLimit ?? 4,
+    
+    // CronJob
+    schedule: spec.schedule || '*/5 * * * *',
+    concurrencyPolicy: spec.concurrencyPolicy || 'Allow'
+  }
+}
 
-// 更新方法
+watch(() => props.selectedNode, (node) => {
+  localData.value = extractData(node)
+}, { immediate: true, deep: true })
+
 function emitUpdate(field, value) {
   emit('update', { field, value })
 }
 
-function updateName() { emitUpdate('name', localData.value.name) }
-function updateNamespace() { emitUpdate('namespace', localData.value.namespace) }
-function updateReplicas() { emitUpdate('replicas', localData.value.replicas) }
-function updateImage() { emitUpdate('image', localData.value.image) }
-function updateContainerPort() { emitUpdate('containerPort', localData.value.containerPort) }
-function updateServiceType() { emitUpdate('serviceType', localData.value.serviceType) }
-function updatePort() { emitUpdate('port', localData.value.port) }
-function updateTargetPort() { emitUpdate('targetPort', localData.value.targetPort) }
-function updateNodePort() { emitUpdate('nodePort', localData.value.nodePort) }
-function updateSelector() { emitUpdate('selector', localData.value.selectorText) }
-function updateHost() { emitUpdate('host', localData.value.host) }
-function updatePath() { emitUpdate('path', localData.value.path) }
-function updateServiceName() { emitUpdate('serviceName', localData.value.serviceName) }
-function updateServicePort() { emitUpdate('servicePort', localData.value.servicePort) }
-function updateConfigData() { emitUpdate('configData', localData.value.configData) }
-function updateSecretType() { emitUpdate('secretType', localData.value.secretType) }
-function updateSecretData() { emitUpdate('secretData', localData.value.secretData) }
-function updateStorage() { emitUpdate('storage', localData.value.storage) }
-function updateAccessMode() { emitUpdate('accessMode', localData.value.accessMode) }
-function updateStorageClass() { emitUpdate('storageClassName', localData.value.storageClassName) }
-function updateBackoffLimit() { emitUpdate('backoffLimit', localData.value.backoffLimit) }
-function updateSchedule() { emitUpdate('schedule', localData.value.schedule) }
-function updateCommand() { emitUpdate('command', localData.value.command) }
+// TLS 操作
+function addTls() {
+  localData.value.tls.push({ hostsText: '', secretName: '' })
+}
+
+function removeTls(index) {
+  localData.value.tls.splice(index, 1)
+  updateTls()
+}
+
+function updateTls() {
+  const tls = localData.value.tls
+    .filter(t => t.hostsText || t.secretName)
+    .map(t => ({
+      hosts: t.hostsText.split('\n').filter(h => h.trim()),
+      secretName: t.secretName
+    }))
+  emitUpdate('tls', tls)
+}
 </script>
+
+<style scoped>
+.property-panel {
+  position: absolute;
+  right: 0;
+  top: 64px;
+  width: 400px;
+  height: calc(100vh - 64px);
+  background: white;
+  border-left: 1px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.property-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-50);
+}
+
+.property-panel__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0;
+}
+
+.property-panel__close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--gray-100);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--gray-600);
+  transition: all 0.2s;
+}
+
+.property-panel__close:hover {
+  background: var(--gray-200);
+  color: var(--gray-800);
+}
+
+.property-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 4px;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: white;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.form-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.hint {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.tls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tls-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  position: relative;
+}
+
+.tls-item .btn-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.btn-add {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--gray-50);
+  border: 1px dashed var(--gray-300);
+  color: var(--gray-600);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-add:hover {
+  background: var(--primary-50);
+  border-color: var(--primary-300);
+  color: var(--primary-600);
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.btn-icon:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.delete-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.btn-danger {
+  width: 100%;
+  padding: 12px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.property-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.property-panel__empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.property-panel__empty p {
+  font-size: 14px;
+}
+</style>

@@ -534,42 +534,240 @@ function onPaneClick() {
   }
 }
 
-// 更新节点数据
+// 更新节点数据 - 支持完整字段编辑
 function updateNodeData(nodeId, field, value) {
   const node = findNode(nodeId)
   if (!node) return
   
   const resource = node.data.resource
   
+  // 确保必要的对象结构存在
+  if (!resource.metadata) resource.metadata = {}
+  if (!resource.spec) resource.spec = {}
+  
+  // 获取和设置 Pod 模板规格的辅助函数
+  const getPodSpec = () => {
+    if (resource.spec.template?.spec) return resource.spec.template.spec
+    if (resource.spec.jobTemplate?.spec?.template?.spec) return resource.spec.jobTemplate.spec.template.spec
+    if (resource.kind === 'Pod') return resource.spec
+    return null
+  }
+  
+  const ensurePodSpec = () => {
+    if (resource.kind === 'Pod') {
+      return resource.spec
+    }
+    if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resource.kind)) {
+      if (!resource.spec.template) resource.spec.template = { metadata: { labels: {} }, spec: {} }
+      if (!resource.spec.template.spec) resource.spec.template.spec = {}
+      return resource.spec.template.spec
+    }
+    if (resource.kind === 'Job') {
+      if (!resource.spec.template) resource.spec.template = { metadata: { labels: {} }, spec: {} }
+      if (!resource.spec.template.spec) resource.spec.template.spec = {}
+      return resource.spec.template.spec
+    }
+    if (resource.kind === 'CronJob') {
+      if (!resource.spec.jobTemplate) resource.spec.jobTemplate = { spec: { template: { metadata: { labels: {} }, spec: {} } } }
+      if (!resource.spec.jobTemplate.spec) resource.spec.jobTemplate.spec = { template: { metadata: { labels: {} }, spec: {} } }
+      if (!resource.spec.jobTemplate.spec.template) resource.spec.jobTemplate.spec.template = { metadata: { labels: {} }, spec: {} }
+      if (!resource.spec.jobTemplate.spec.template.spec) resource.spec.jobTemplate.spec.template.spec = {}
+      return resource.spec.jobTemplate.spec.template.spec
+    }
+    return null
+  }
+  
   switch (field) {
+    // === 元数据 ===
     case 'name':
       node.data.name = value
       resource.metadata.name = value
+      // 同步更新 app 标签
+      if (!resource.metadata.labels) resource.metadata.labels = {}
+      resource.metadata.labels.app = value
       break
+      
     case 'namespace':
       resource.metadata.namespace = value
       break
+      
+    case 'labels':
+      resource.metadata.labels = { ...value }
+      break
+      
+    case 'annotations':
+      resource.metadata.annotations = value && Object.keys(value).length > 0 ? { ...value } : undefined
+      break
+    
+    // === Deployment/StatefulSet 配置 ===
     case 'replicas':
-      if (resource.spec) resource.spec.replicas = value
+      resource.spec.replicas = value
       break
-    case 'image':
-      if (resource.spec?.template?.spec?.containers?.[0]) {
-        resource.spec.template.spec.containers[0].image = value
-      } else if (resource.spec?.containers?.[0]) {
-        resource.spec.containers[0].image = value
-      } else if (resource.spec?.jobTemplate?.spec?.template?.spec?.containers?.[0]) {
-        resource.spec.jobTemplate.spec.template.spec.containers[0].image = value
+      
+    case 'strategyType':
+      if (!resource.spec.strategy) resource.spec.strategy = {}
+      resource.spec.strategy.type = value
+      break
+      
+    case 'serviceName':
+      // StatefulSet 的 headless service 名称
+      if (resource.kind === 'StatefulSet') {
+        resource.spec.serviceName = value
       }
       break
-    case 'containerPort':
-      if (resource.spec?.template?.spec?.containers?.[0]) {
-        resource.spec.template.spec.containers[0].ports = [{ containerPort: value }]
-      } else if (resource.spec?.containers?.[0]) {
-        resource.spec.containers[0].ports = [{ containerPort: value }]
-      }
+    
+    // === Pod 配置 ===
+    case 'restartPolicy': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.restartPolicy = value
       break
+    }
+    
+    case 'serviceAccountName': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.serviceAccountName = value || undefined
+      break
+    }
+    
+    case 'nodeSelector': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.nodeSelector = value && Object.keys(value).length > 0 ? { ...value } : undefined
+      break
+    }
+    
+    case 'volumes': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.volumes = value && value.length > 0 ? value : undefined
+      break
+    }
+    
+    case 'containers': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.containers = value
+      break
+    }
+    
+    // === Service 配置 ===
     case 'serviceType':
-      if (resource.spec) resource.spec.type = value
+      resource.spec.type = value
+      break
+      
+    case 'selector':
+      resource.spec.selector = value && Object.keys(value).length > 0 ? { ...value } : undefined
+      break
+      
+    case 'ports':
+      resource.spec.ports = value
+      break
+      
+    case 'externalName':
+      resource.spec.externalName = value || undefined
+      break
+    
+    // === Ingress 配置 ===
+    case 'ingressClassName':
+      resource.spec.ingressClassName = value || undefined
+      break
+      
+    case 'rules':
+      resource.spec.rules = value
+      break
+      
+    case 'tls':
+      resource.spec.tls = value && value.length > 0 ? value : undefined
+      break
+    
+    // === ConfigMap 配置 ===
+    case 'configData':
+      resource.data = value && Object.keys(value).length > 0 ? { ...value } : {}
+      break
+    
+    // === Secret 配置 ===
+    case 'secretType':
+      resource.type = value
+      break
+      
+    case 'secretData':
+      resource.stringData = value && Object.keys(value).length > 0 ? { ...value } : {}
+      break
+    
+    // === PVC 配置 ===
+    case 'storage':
+      if (!resource.spec.resources) resource.spec.resources = { requests: {} }
+      if (!resource.spec.resources.requests) resource.spec.resources.requests = {}
+      resource.spec.resources.requests.storage = value
+      break
+      
+    case 'accessModes':
+      resource.spec.accessModes = value
+      break
+      
+    case 'storageClassName':
+      resource.spec.storageClassName = value || undefined
+      break
+    
+    // === Job 配置 ===
+    case 'completions':
+      resource.spec.completions = value
+      break
+      
+    case 'parallelism':
+      resource.spec.parallelism = value
+      break
+      
+    case 'backoffLimit':
+      if (resource.kind === 'CronJob') {
+        if (!resource.spec.jobTemplate) resource.spec.jobTemplate = { spec: {} }
+        if (!resource.spec.jobTemplate.spec) resource.spec.jobTemplate.spec = {}
+        resource.spec.jobTemplate.spec.backoffLimit = value
+      } else {
+        resource.spec.backoffLimit = value
+      }
+      break
+    
+    // === CronJob 配置 ===
+    case 'schedule':
+      resource.spec.schedule = value
+      break
+      
+    case 'concurrencyPolicy':
+      resource.spec.concurrencyPolicy = value
+      break
+    
+    // === 旧版兼容 (单容器简化编辑) ===
+    case 'image': {
+      const podSpec = getPodSpec()
+      if (podSpec?.containers?.[0]) {
+        podSpec.containers[0].image = value
+      }
+      break
+    }
+    
+    case 'containerPort': {
+      const podSpec = getPodSpec()
+      if (podSpec?.containers?.[0]) {
+        podSpec.containers[0].ports = [{ containerPort: value }]
+      }
+      break
+    }
+    
+    case 'command': {
+      const cmd = typeof value === 'string' ? value.split(' ').filter(s => s) : value
+      const podSpec = getPodSpec()
+      if (podSpec?.containers?.[0]) {
+        podSpec.containers[0].command = cmd
+      }
+      break
+    }
+    
+    // 旧版字段兼容
+    case 'host':
+      if (resource.spec?.rules?.[0]) resource.spec.rules[0].host = value
+      break
+    case 'path':
+      if (resource.spec?.rules?.[0]?.http?.paths?.[0]) {
+        resource.spec.rules[0].http.paths[0].path = value
+      }
       break
     case 'port':
       if (resource.spec?.ports?.[0]) resource.spec.ports[0].port = value
@@ -580,83 +778,14 @@ function updateNodeData(nodeId, field, value) {
     case 'nodePort':
       if (resource.spec?.ports?.[0]) resource.spec.ports[0].nodePort = value
       break
-    case 'selector':
-      const selectorLines = value.split('\n').filter(l => l.trim())
-      const selector = {}
-      selectorLines.forEach(line => {
-        const [key, val] = line.split(':').map(s => s.trim())
-        if (key && val) selector[key] = val
-      })
-      if (resource.spec) resource.spec.selector = selector
-      break
-    case 'host':
-      if (resource.spec?.rules?.[0]) resource.spec.rules[0].host = value
-      break
-    case 'path':
-      if (resource.spec?.rules?.[0]?.http?.paths?.[0]) {
-        resource.spec.rules[0].http.paths[0].path = value
-      }
-      break
-    case 'serviceName':
-      if (resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service) {
-        resource.spec.rules[0].http.paths[0].backend.service.name = value
-      }
-      break
-    case 'servicePort':
-      if (resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service?.port) {
-        resource.spec.rules[0].http.paths[0].backend.service.port.number = value
-      }
-      break
-    case 'configData':
-      const dataLines = value.split('\n').filter(l => l.trim())
-      const data = {}
-      dataLines.forEach(line => {
-        const [key, ...valParts] = line.split(':')
-        if (key) data[key.trim()] = valParts.join(':').trim()
-      })
-      resource.data = data
-      break
-    case 'secretType':
-      resource.type = value
-      break
-    case 'secretData':
-      const secretLines = value.split('\n').filter(l => l.trim())
-      const stringData = {}
-      secretLines.forEach(line => {
-        const [key, ...valParts] = line.split(':')
-        if (key) stringData[key.trim()] = valParts.join(':').trim()
-      })
-      resource.stringData = stringData
-      break
-    case 'storage':
-      if (resource.spec?.resources?.requests) {
-        resource.spec.resources.requests.storage = value
-      }
-      break
     case 'accessMode':
-      if (resource.spec) resource.spec.accessModes = [value]
-      break
-    case 'storageClassName':
-      if (resource.spec) resource.spec.storageClassName = value || undefined
-      break
-    case 'backoffLimit':
-      if (resource.spec) resource.spec.backoffLimit = value
-      break
-    case 'schedule':
-      if (resource.spec) resource.spec.schedule = value
-      break
-    case 'command':
-      const cmd = value.split(' ').filter(s => s)
-      if (resource.spec?.template?.spec?.containers?.[0]) {
-        resource.spec.template.spec.containers[0].command = cmd
-      } else if (resource.spec?.jobTemplate?.spec?.template?.spec?.containers?.[0]) {
-        resource.spec.jobTemplate.spec.template.spec.containers[0].command = cmd
-      }
+      resource.spec.accessModes = [value]
       break
   }
   
   emit('nodesChange', nodes.value)
 }
+
 
 // 删除节点
 function deleteNode(nodeId) {
