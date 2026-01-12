@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Service Generator > Snapshot Testing > should match snapshot for LoadBalancer service > loadbalancer-service 1`] = `
+"apiVersion: v1
+kind: Service
+metadata:
+  name: production-lb
+  namespace: production
+  labels:
+    tier: frontend
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 443
+      targetPort: 8443
+      name: https
+  selector:
+    app: web
+    tier: frontend
+"
+`;

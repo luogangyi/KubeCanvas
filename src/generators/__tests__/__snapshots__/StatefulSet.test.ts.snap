@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StatefulSet Generator > Snapshot Testing > should match snapshot for database StatefulSet > mongodb-statefulset 1`] = `
+"apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: database
+  labels:
+    app.kubernetes.io/name: mongodb
+spec:
+  replicas: 3
+  serviceName: mongodb-headless
+  selector:
+    matchLabels:
+      app: mongodb
+      app.kubernetes.io/name: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        app.kubernetes.io/name: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+"
+`;

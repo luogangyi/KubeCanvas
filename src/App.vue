@@ -171,6 +171,19 @@ async function saveComposition() {
     return
   }
   
+  // 验证 Ingress 资源的 backend 配置
+  const invalidIngresses = resources.filter(r => {
+    if (r.kind !== 'Ingress') return false
+    const paths = r.spec?.rules?.[0]?.http?.paths || []
+    return paths.some(p => !p.backend?.service?.name)
+  })
+  
+  if (invalidIngresses.length > 0) {
+    const names = invalidIngresses.map(i => i.metadata.name).join(', ')
+    showToast(`Ingress (${names}) 需要连接到 Service`, 'error')
+    return
+  }
+  
   saving.value = true
   
   try {
@@ -210,8 +223,12 @@ async function loadComposition(compositionId) {
       return
     }
     
-    // 转换为节点格式
-    const nodes = resources.map((resource, index) => {
+    console.log('Loaded resources from K8s:', resources)
+    
+    // 转换为节点格式（过滤掉无效资源）
+    const nodes = resources
+      .filter(resource => resource && resource.kind && resource.metadata)
+      .map((resource, index) => {
       const kind = resource.kind.toLowerCase()
       return {
         id: resource.metadata.uid || `node-${index}`,
@@ -247,6 +264,7 @@ async function loadComposition(compositionId) {
       }
     })
     
+    console.log('Setting initialNodes:', nodes.length, 'initialEdges:', edges.length)
     initialNodes.value = nodes
     initialEdges.value = edges
     currentCompositionId.value = compositionId

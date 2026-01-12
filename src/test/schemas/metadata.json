@@ -1,0 +1,15 @@
+{
+  "downloadedAt": "2026-01-12T02:37:27.115Z",
+  "targetVersion": "v1.33.7",
+  "schemas": {
+    "Deployment": "v1.33.7",
+    "StatefulSet": "v1.33.7",
+    "Job": "v1.33.7",
+    "CronJob": "v1.33.7",
+    "Service": "v1.33.7",
+    "ConfigMap": "v1.33.7",
+    "Secret": "v1.33.7",
+    "PersistentVolumeClaim": "v1.33.7",
+    "Ingress": "v1.33.7"
+  }
+}

@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Job Generator > Snapshot Testing > should match snapshot for data processing Job > etl-job 1`] = `
+"apiVersion: batch/v1
+kind: Job
+metadata:
+  name: etl-job
+  namespace: data-pipeline
+  labels:
+    pipeline: etl
+    stage: transform
+spec:
+  parallelism: 4
+  completions: 100
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: etl-job
+        pipeline: etl
+        stage: transform
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: etl
+          image: myorg/etl-processor:v2.0
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          env:
+            - name: SOURCE_BUCKET
+              value: s3://data-lake/raw
+            - name: DEST_BUCKET
+              value: s3://data-lake/processed
+"
+`;

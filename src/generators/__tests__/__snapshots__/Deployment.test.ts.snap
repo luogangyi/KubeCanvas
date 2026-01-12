@@ -1,0 +1,120 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Deployment Generator > Snapshot Testing > should match snapshot for full deployment > full-deployment 1`] = `
+"apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-web-app
+  namespace: production
+  labels:
+    team: backend
+    environment: production
+  annotations:
+    description: Main web application deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-web-app
+      team: backend
+      environment: production
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        app: my-web-app
+        team: backend
+        environment: production
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.24-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: password
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: data
+              mountPath: /var/www/html
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      initContainers:
+        - name: init-db
+          image: busybox:latest
+          command:
+            - sh
+            - "-c"
+            - echo Waiting for DB...
+      volumes:
+        - name: config
+          configMap:
+            name: nginx-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: web-data-pvc
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: web-app-sa
+"
+`;
+
+exports[`Deployment Generator > Snapshot Testing > should match snapshot for minimal deployment > minimal-deployment 1`] = `
+"apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-app
+  template:
+    metadata:
+      labels:
+        app: simple-app
+    spec:
+      containers:
+        - name: app
+          image: busybox:latest
+"
+`;

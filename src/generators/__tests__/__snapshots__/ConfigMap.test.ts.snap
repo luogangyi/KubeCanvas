@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ConfigMap Generator > Snapshot Testing > should match snapshot for full ConfigMap > nginx-configmap 1`] = `
+"apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: web
+  labels:
+    app: nginx
+data:
+  nginx.conf: server { listen 80; }
+  mime.types: text/html html;
+immutable: false
+"
+`;

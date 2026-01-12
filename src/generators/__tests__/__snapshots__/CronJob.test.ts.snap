@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CronJob Generator > Snapshot Testing > should match snapshot for backup CronJob > database-backup-cronjob 1`] = `
+"apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: backup
+  labels:
+    backup: database
+    frequency: daily
+spec:
+  schedule: 0 1 * * *
+  timeZone: UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: database-backup
+            backup: database
+            frequency: daily
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: backup-tools:v3
+              env:
+                - name: DB_HOST
+                  value: postgres.database.svc
+                - name: BACKUP_BUCKET
+                  value: s3://backups/database
+              volumeMounts:
+                - name: secrets
+                  mountPath: /etc/secrets
+                  readOnly: true
+          volumes:
+            - name: secrets
+              secret:
+                secretName: backup-credentials
+"
+`;

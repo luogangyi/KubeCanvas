@@ -1,0 +1,351 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Resource Combinations > Deployment + ConfigMap + Secret > should match snapshot for complete stack > deployment-configmap-secret-stack 1`] = `
+"apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: production
+data:
+  config.yaml: |-
+    database:
+      host: localhost
+      port: 5432
+  logging.yaml: |-
+    level: info
+    format: json
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: production
+type: Opaque
+stringData:
+  DB_PASSWORD: supersecret123
+  API_KEY: key-abc-123
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: app
+          image: myapp:v1.2.3
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: API_KEY
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/app/config
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: app-config
+"
+`;
+
+exports[`Resource Combinations > Deployment + PVC (Stateful Application) > should match snapshot for MySQL stack > mysql-deployment-pvc-stack 1`] = `
+"apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - "-h"
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - mysql
+                - "-e"
+                - SELECT 1
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-data
+"
+`;
+
+exports[`Resource Combinations > Full Web Application Stack > should match snapshot for complete web stack > full-web-application-stack 1`] = `
+"apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: web
+data:
+  nginx.conf: server { listen 80; location / { proxy_pass http://backend:8080; } }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tls-cert
+  namespace: web
+type: kubernetes.io/tls
+data:
+  tls.crt: Y2VydGlmaWNhdGU=
+  tls.key: cHJpdmF0ZWtleQ==
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-files
+  namespace: web
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-frontend
+  namespace: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: web-frontend
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.24
+          ports:
+            - containerPort: 80
+              name: http
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: static
+              mountPath: /usr/share/nginx/html
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 80
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: nginx-config
+        - name: static
+          persistentVolumeClaim:
+            claimName: static-files
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-frontend
+  namespace: web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: web-frontend
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-ingress
+  namespace: web
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - www.example.com
+      secretName: tls-cert
+  rules:
+    - host: www.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-frontend
+                port:
+                  number: 80
+"
+`;
+
+exports[`Resource Combinations > Microservices Architecture > should match snapshot for microservices architecture > microservices-architecture 1`] = `
+"apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: microservices
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: kong:3.0
+          ports:
+            - containerPort: 8000
+            - containerPort: 8443
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: microservices
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: users
+          image: user-service:v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: host
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: microservices
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: orders
+          image: order-service:v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: USER_SERVICE_URL
+              value: http://user-service:8080
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: password
+"
+`;

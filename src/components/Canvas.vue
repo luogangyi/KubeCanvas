@@ -166,15 +166,19 @@ const defaultEdgeOptions = {
 const nodes = ref([])
 const edges = ref([])
 
-// 监听初始数据
+// 监听初始数据 - 加载已保存的组合时使用
 watch([() => props.initialNodes, () => props.initialEdges], ([newNodes, newEdges]) => {
-  if (newNodes.length > 0) {
-    nodes.value = newNodes
+  // 只有当新数据不为空时才更新（避免初始化时清空）
+  if (newNodes && newNodes.length > 0) {
+    // 使用深拷贝避免响应式问题
+    nodes.value = JSON.parse(JSON.stringify(newNodes))
+    console.log('Loaded nodes:', nodes.value.length)
   }
-  if (newEdges.length > 0) {
-    edges.value = newEdges
+  if (newEdges && newEdges.length > 0) {
+    edges.value = JSON.parse(JSON.stringify(newEdges))
+    console.log('Loaded edges:', edges.value.length)
   }
-}, { immediate: true })
+}, { deep: true })
 
 // 取消连线操作
 function cancelConnection() {
@@ -461,6 +465,27 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
   )
   if (existingEdge) return
   
+  // 工作负载类型列表
+  const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+  
+  // 获取工作负载的 Pod Spec
+  const getPodSpec = (resource) => {
+    if (resource.kind === 'Pod') return resource.spec
+    if (['Deployment', 'StatefulSet', 'DaemonSet', 'Job'].includes(resource.kind)) {
+      if (!resource.spec.template) resource.spec.template = { metadata: { labels: {} }, spec: {} }
+      if (!resource.spec.template.spec) resource.spec.template.spec = {}
+      return resource.spec.template.spec
+    }
+    if (resource.kind === 'CronJob') {
+      if (!resource.spec.jobTemplate) resource.spec.jobTemplate = { spec: { template: { metadata: { labels: {} }, spec: {} } } }
+      if (!resource.spec.jobTemplate.spec) resource.spec.jobTemplate.spec = { template: { metadata: { labels: {} }, spec: {} } }
+      if (!resource.spec.jobTemplate.spec.template) resource.spec.jobTemplate.spec.template = { metadata: { labels: {} }, spec: {} }
+      if (!resource.spec.jobTemplate.spec.template.spec) resource.spec.jobTemplate.spec.template.spec = {}
+      return resource.spec.jobTemplate.spec.template.spec
+    }
+    return null
+  }
+  
   // 如果是 Service 连接到 Deployment/StatefulSet/Pod
   if (sourceNode.type === 'service' && 
       ['deployment', 'statefulset', 'pod'].includes(targetNode.type)) {
@@ -483,6 +508,107 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
     if (sourceNode.data.resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service) {
       sourceNode.data.resource.spec.rules[0].http.paths[0].backend.service.name = serviceName
       sourceNode.data.resource.spec.rules[0].http.paths[0].backend.service.port.number = servicePort
+    }
+  }
+  
+  // 处理存储/配置资源连接（支持双向：PVC/ConfigMap/Secret ↔ 工作负载）
+  const storageTypes = ['pvc', 'configmap', 'secret']
+  
+  // 确定哪个是存储资源，哪个是工作负载
+  let storageNode = null
+  let workloadNode = null
+  
+  if (storageTypes.includes(sourceNode.type) && workloadTypes.includes(targetNode.type)) {
+    storageNode = sourceNode
+    workloadNode = targetNode
+  } else if (workloadTypes.includes(sourceNode.type) && storageTypes.includes(targetNode.type)) {
+    storageNode = targetNode
+    workloadNode = sourceNode
+  }
+  
+  // 如果是存储资源与工作负载的连接
+  if (storageNode && workloadNode) {
+    const resource = workloadNode.data.resource
+    const podSpec = getPodSpec(resource)
+    
+    if (podSpec) {
+      // 根据存储类型处理
+      if (storageNode.type === 'pvc') {
+        const pvcName = storageNode.data.name
+        const volumeName = `vol-${pvcName}`
+        
+        // 确保 volumes 数组存在
+        if (!podSpec.volumes) podSpec.volumes = []
+        
+        // 检查是否已存在同名 volume
+        if (!podSpec.volumes.find(v => v.name === volumeName)) {
+          podSpec.volumes.push({
+            name: volumeName,
+            persistentVolumeClaim: { claimName: pvcName }
+          })
+        }
+        
+        // 添加 volumeMount
+        if (podSpec.containers && podSpec.containers.length > 0) {
+          if (!podSpec.containers[0].volumeMounts) podSpec.containers[0].volumeMounts = []
+          if (!podSpec.containers[0].volumeMounts.find(m => m.name === volumeName)) {
+            podSpec.containers[0].volumeMounts.push({
+              name: volumeName,
+              mountPath: `/mnt/${pvcName}`
+            })
+          }
+        }
+      }
+      
+      if (storageNode.type === 'configmap') {
+        const configMapName = storageNode.data.name
+        const volumeName = `cm-${configMapName}`
+        
+        if (!podSpec.volumes) podSpec.volumes = []
+        
+        if (!podSpec.volumes.find(v => v.name === volumeName)) {
+          podSpec.volumes.push({
+            name: volumeName,
+            configMap: { name: configMapName }
+          })
+        }
+        
+        if (podSpec.containers && podSpec.containers.length > 0) {
+          if (!podSpec.containers[0].volumeMounts) podSpec.containers[0].volumeMounts = []
+          if (!podSpec.containers[0].volumeMounts.find(m => m.name === volumeName)) {
+            podSpec.containers[0].volumeMounts.push({
+              name: volumeName,
+              mountPath: `/etc/config/${configMapName}`,
+              readOnly: true
+            })
+          }
+        }
+      }
+      
+      if (storageNode.type === 'secret') {
+        const secretName = storageNode.data.name
+        const volumeName = `secret-${secretName}`
+        
+        if (!podSpec.volumes) podSpec.volumes = []
+        
+        if (!podSpec.volumes.find(v => v.name === volumeName)) {
+          podSpec.volumes.push({
+            name: volumeName,
+            secret: { secretName: secretName }
+          })
+        }
+        
+        if (podSpec.containers && podSpec.containers.length > 0) {
+          if (!podSpec.containers[0].volumeMounts) podSpec.containers[0].volumeMounts = []
+          if (!podSpec.containers[0].volumeMounts.find(m => m.name === volumeName)) {
+            podSpec.containers[0].volumeMounts.push({
+              name: volumeName,
+              mountPath: `/etc/secrets/${secretName}`,
+              readOnly: true
+            })
+          }
+        }
+      }
     }
   }
   
