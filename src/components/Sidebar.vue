@@ -5,6 +5,26 @@
     </div>
     
     <div class="sidebar__content">
+      <!-- 集群（放在最前面）-->
+      <div class="section-title">集群</div>
+      <div class="resource-list">
+        <div
+          v-for="resource in clusterResources"
+          :key="resource.type"
+          class="resource-card"
+          :class="`resource-card--${resource.type}`"
+          draggable="true"
+          @dragstart="onDragStart($event, resource)"
+          @mouseenter="showTooltip($event, resource.description)"
+          @mouseleave="hideTooltip"
+        >
+          <div class="resource-card__icon">
+            <img :src="getIconUrl(resource.icon)" :alt="resource.name" />
+          </div>
+          <div class="resource-card__name">{{ resource.name }}</div>
+        </div>
+      </div>
+      
       <!-- 工作负载 -->
       <div class="section-title">工作负载</div>
       <div class="resource-list">
@@ -129,6 +149,7 @@ import secretIcon from '../assets/icons/secret.svg'
 import pvcIcon from '../assets/icons/pvc.svg'
 import jobIcon from '../assets/icons/job.svg'
 import cronjobIcon from '../assets/icons/cronjob.svg'
+import nsIcon from '../assets/icons/ns.svg'
 
 const iconMap = {
   deploy: deployIcon,
@@ -140,7 +161,8 @@ const iconMap = {
   secret: secretIcon,
   pvc: pvcIcon,
   job: jobIcon,
-  cronjob: cronjobIcon
+  cronjob: cronjobIcon,
+  ns: nsIcon
 }
 
 defineProps({
@@ -194,6 +216,10 @@ const configResources = computed(() =>
 
 const storageResources = computed(() => 
   resourceTypes.filter(r => r.category === 'storage')
+)
+
+const clusterResources = computed(() => 
+  resourceTypes.filter(r => r.category === 'cluster')
 )
 
 // 拖拽开始

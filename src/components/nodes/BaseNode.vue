@@ -50,6 +50,7 @@ import secretIcon from '../../assets/icons/secret.svg'
 import pvcIcon from '../../assets/icons/pvc.svg'
 import jobIcon from '../../assets/icons/job.svg'
 import cronjobIcon from '../../assets/icons/cronjob.svg'
+import nsIcon from '../../assets/icons/ns.svg'
 
 const iconMap = {
   deploy: deployIcon,
@@ -61,7 +62,8 @@ const iconMap = {
   secret: secretIcon,
   pvc: pvcIcon,
   job: jobIcon,
-  cronjob: cronjobIcon
+  cronjob: cronjobIcon,
+  ns: nsIcon
 }
 
 const props = defineProps({

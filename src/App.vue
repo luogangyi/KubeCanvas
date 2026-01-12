@@ -186,8 +186,17 @@ async function saveComposition() {
   
   saving.value = true
   
+  // 对资源排序：Namespace 必须先创建
+  const sortedResources = [...resources].sort((a, b) => {
+    if (a.kind === 'Namespace' && b.kind !== 'Namespace') return -1
+    if (a.kind !== 'Namespace' && b.kind === 'Namespace') return 1
+    return 0
+  })
+  
+  console.log('Creating resources in order:', sortedResources.map(r => `${r.kind}/${r.metadata?.name}`))
+  
   try {
-    const { results, errors } = await createResources(resources)
+    const { results, errors } = await createResources(sortedResources)
     
     if (errors.length === 0) {
       showToast(`成功创建 ${results.length} 个资源！`)

@@ -433,6 +433,25 @@ export function createCronJobTemplate(name, options = {}) {
     }
 }
 
+// Namespace 模板
+export function createNamespaceTemplate(name, options = {}) {
+    const {
+        labels = {}
+    } = options
+
+    return {
+        apiVersion: 'v1',
+        kind: 'Namespace',
+        metadata: {
+            name,
+            labels: {
+                'kubernetes.io/metadata.name': name,
+                ...labels
+            }
+        }
+    }
+}
+
 // 根据类型创建资源模板
 export function createResourceTemplate(type, name, options = {}) {
     const templateCreators = {
@@ -445,7 +464,8 @@ export function createResourceTemplate(type, name, options = {}) {
         secret: createSecretTemplate,
         pvc: createPVCTemplate,
         job: createJobTemplate,
-        cronjob: createCronJobTemplate
+        cronjob: createCronJobTemplate,
+        namespace: createNamespaceTemplate
     }
 
     const creator = templateCreators[type.toLowerCase()]
@@ -456,8 +476,16 @@ export function createResourceTemplate(type, name, options = {}) {
     return creator(name, options)
 }
 
-// 资源类型配置
+// 资源类型配置 - Namespace 放在最前面
 export const resourceTypes = [
+    {
+        type: 'namespace',
+        name: 'Namespace',
+        description: '命名空间容器',
+        icon: 'ns',
+        color: '#6b7280',
+        category: 'cluster'
+    },
     {
         type: 'deployment',
         name: 'Deployment',

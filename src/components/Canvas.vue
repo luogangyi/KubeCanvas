@@ -77,6 +77,9 @@
       @connect-start="onConnectStart"
       @connect-end="onConnectEnd"
       @node-click="onNodeClick"
+      @node-double-click="onNodeDoubleClick"
+      @node-drag-start="onNodeDragStart"
+      @node-drag-stop="onNodeDragStop"
       @pane-click="onPaneClick"
     >
       <Background :gap="20" :size="1" />
@@ -92,7 +95,9 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { v4 as uuidv4 } from 'uuid'
 import BaseNode from './nodes/BaseNode.vue'
+import NamespaceNode from './nodes/NamespaceNode.vue'
 import { createResourceTemplate, getResourceTypeConfig } from '../utils/resourceTemplates.js'
+import { getDefaultNamespace } from '../composables/useK8sApi.js'
 
 const props = defineProps({
   compositionId: {
@@ -112,7 +117,7 @@ const props = defineProps({
 const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect'])
 
 const vueFlowRef = ref(null)
-const { project, findNode, getNodes, getEdges } = useVueFlow()
+const { project, findNode, getNodes, getEdges, removeSelectedNodes } = useVueFlow()
 
 // 连线状态
 const isConnecting = ref(false)
@@ -150,7 +155,8 @@ const nodeTypes = {
   secret: markRaw(BaseNode),
   pvc: markRaw(BaseNode),
   job: markRaw(BaseNode),
-  cronjob: markRaw(BaseNode)
+  cronjob: markRaw(BaseNode),
+  namespace: markRaw(NamespaceNode)
 }
 
 // 默认边选项 - 实线
@@ -419,8 +425,16 @@ function onDrop(event) {
   const nodeId = uuidv4()
   const nodeName = `${resource.type}-${nodeId.slice(0, 4)}`
   
+  // 使用配置中的默认命名空间
+  const defaultNs = getDefaultNamespace()
+  
+  // 检查是否落在某个 Namespace 容器内
+  const containingNamespace = findContainingNamespace(x, y)
+  const targetNamespace = containingNamespace ? containingNamespace.data.name : defaultNs
+  
+  // 创建资源模板
   const resourceTemplate = createResourceTemplate(resource.type, nodeName, {
-    namespace: 'default'
+    namespace: resource.type === 'namespace' ? undefined : targetNamespace
   })
   
   if (resource.type === 'service') {
@@ -431,13 +445,113 @@ function onDrop(event) {
     id: nodeId,
     type: resource.type,
     position: { x, y },
+    // Namespace 放到底层（zIndex 较小），其他资源放到上层
+    zIndex: resource.type === 'namespace' ? 0 : 10,
     data: {
       name: nodeName,
-      resource: resourceTemplate
+      resource: resourceTemplate,
+      // Namespace 容器的默认大小
+      ...(resource.type === 'namespace' ? { width: 600, height: 450 } : {})
     }
   }
   
-  nodes.value.push(newNode)
+  // Namespace 节点放到数组最前面（渲染在底层）
+  if (resource.type === 'namespace') {
+    nodes.value.unshift(newNode)
+  } else {
+    nodes.value.push(newNode)
+  }
+  emit('nodesChange', nodes.value)
+}
+
+// 检查坐标是否在某个 Namespace 容器内
+function findContainingNamespace(x, y) {
+  const namespaceNodes = nodes.value.filter(n => n.type === 'namespace')
+  
+  for (const ns of namespaceNodes) {
+    const width = ns.data.width || 400
+    const height = ns.data.height || 300
+    
+    if (x >= ns.position.x && x <= ns.position.x + width &&
+        y >= ns.position.y && y <= ns.position.y + height) {
+      return ns
+    }
+  }
+  return null
+}
+
+// Namespace 拖拽开始时的状态
+const namespaceDragState = ref({
+  nodeId: null,
+  startPosition: null,
+  childNodes: [] // 拖拽开始时在 Namespace 内的节点
+})
+
+// 节点拖拽开始 - 记录 Namespace 位置和内部节点
+function onNodeDragStart(event) {
+  const { node } = event
+  
+  if (node.type === 'namespace') {
+    // 记录 Namespace 的起始位置和内部节点
+    const nsWidth = node.data.width || 600
+    const nsHeight = node.data.height || 450
+    
+    const childNodes = nodes.value.filter(n => {
+      if (n.type === 'namespace' || n.id === node.id) return false
+      const centerX = n.position.x + 50
+      const centerY = n.position.y + 30
+      return centerX >= node.position.x && centerX <= node.position.x + nsWidth &&
+             centerY >= node.position.y && centerY <= node.position.y + nsHeight
+    })
+    
+    namespaceDragState.value = {
+      nodeId: node.id,
+      startPosition: { ...node.position },
+      childNodes: childNodes.map(n => ({ id: n.id, offsetX: n.position.x - node.position.x, offsetY: n.position.y - node.position.y }))
+    }
+  }
+}
+
+// 节点拖拽结束 - 检查是否进入或离开 Namespace 容器
+function onNodeDragStop(event) {
+  const { node } = event
+  
+  // 如果是 Namespace 移动，更新内部节点位置
+  if (node.type === 'namespace' && namespaceDragState.value.nodeId === node.id) {
+    const dx = node.position.x - namespaceDragState.value.startPosition.x
+    const dy = node.position.y - namespaceDragState.value.startPosition.y
+    
+    // 移动所有内部节点
+    namespaceDragState.value.childNodes.forEach(child => {
+      const childNode = nodes.value.find(n => n.id === child.id)
+      if (childNode) {
+        childNode.position.x = node.position.x + child.offsetX
+        childNode.position.y = node.position.y + child.offsetY
+      }
+    })
+    
+    // 清空状态
+    namespaceDragState.value = { nodeId: null, startPosition: null, childNodes: [] }
+    // 取消 Namespace 的选中状态，以便内部组件可被选中
+    removeSelectedNodes([node])
+    emit('nodesChange', nodes.value)
+    return
+  }
+  
+  // 非 Namespace 节点：检查是否进入或离开 Namespace
+  const defaultNs = getDefaultNamespace()
+  const containingNamespace = findContainingNamespace(
+    node.position.x + 50, // 使用节点中心点
+    node.position.y + 30
+  )
+  
+  const targetNamespace = containingNamespace ? containingNamespace.data.name : defaultNs
+  
+  // 更新资源的 namespace
+  if (node.data.resource && node.data.resource.metadata) {
+    node.data.resource.metadata.namespace = targetNamespace
+  }
+  
   emit('nodesChange', nodes.value)
 }
 
@@ -653,8 +767,20 @@ function onEdgesChange(changes) {
 // 节点点击
 function onNodeClick({ node }) {
   if (!isConnecting.value) {
+    // Namespace 节点点击时取消选中，以便内部组件可以被选中
+    // 如果需要编辑 Namespace，双击可以打开属性面板
+    if (node.type === 'namespace') {
+      // 取消 Namespace 的选中状态
+      removeSelectedNodes([node])
+      return
+    }
     emit('nodeSelect', node)
   }
+}
+
+// 节点双击 - 用于选中 Namespace 进行编辑
+function onNodeDoubleClick({ node }) {
+  emit('nodeSelect', node)
 }
 
 // 画布点击

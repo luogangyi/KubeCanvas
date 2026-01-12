@@ -21,7 +21,8 @@
           />
         </div>
         
-        <div class="form-group">
+        <!-- Namespace 是集群级资源，不需要显示 namespace 字段 -->
+        <div class="form-group" v-if="nodeType !== 'namespace'">
           <label class="form-label">命名空间</label>
           <input
             type="text"

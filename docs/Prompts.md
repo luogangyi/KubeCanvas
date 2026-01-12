@@ -335,4 +335,42 @@ K8s的配置文件拆成2个，一个是example文件，存放配置的填写说
 测试发现关联pvc、secret、configmap到Deployment、statefulset、pod、job、cronjob等资源时，并没有修改这些资源中的volumes下的对应内容
 ```
 
+```
+测试发现如果直接创建Deployment和pvc，他们连线以后，Deployment中没有出现volume，控制台没有任何输出。但是先做一遍pvc和pod的连线，然后对这个pvc做和Deployment的连线，就正常了。此时控制台有输出
+```
 
+
+```
+测试发现点击“已保存的组合”，页面上显示“已加载资源”但是画板上没有显示出组件和连线
+
+```
+
+
+
+# day4 优化ns的设置逻辑
+
+```
+优化Namespace的逻辑
+1）对于配置文件中设置的默认Namespace，应该默认设置到画布上拖出来的资源组件中，例如配置中设置了Namespace为test1，那么所有从画布上拖出来的组件的namespace应该也设置为test
+2）页面左侧的资源栏新增Namespace类型的资源，拖动Namespace到画布上时，应该是一个较大的方块（可以改变大小），然后其他资源组件如果拖动到这个Namespace的方块中，则把对应资源组件的Namespace的值设置成该Namespace的值，如果拖到Namespace方块外面，则设置成配置文件中配置的Namespace的默认值
+```
+
+
+```
+默认namespace测试通过，但是侧边栏没有namespace类型的资源
+```
+
+
+```
+把资源组件拖入、拖出Namespace组件，可以正确修改资源组件的Namespace值，但是有几个问题要优化
+1）namespace组件应该放在侧边栏最上方，并且namespace组件应该有个logo（请参考cncf官方项目，如dashborad项目）更新logo
+2）namespace组件的大小默认要更大一些
+3）当资源组件拖入namespace组件后，资源组件就无法被选中，而只能选中namespace组件,需要改成优先选中资源组件
+4) 移动namespace组件时，namespace组件内部的资源组件应该跟着移动
+5）当资源组件拖入namespace组件时，应该高亮namespace组件的边宽，提示用户已正确移入。
+
+```
+
+```
+保存的时候报useK8sApi.js:210   POST http://localhost:5173/k8s-api/apis/batch/v1/namespaces/namespace-4630/cronjobs 404 (Not Found) 应该是创建顺序问题，应该先创建那么，再创建其他资源。另外，Namespace资源的属性中，不应该在有Namespace了（当前显示有个名为default的Namespace）
+```

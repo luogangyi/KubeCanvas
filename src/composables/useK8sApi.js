@@ -27,6 +27,13 @@ const k8sConfig = {
     }
 }
 
+/**
+ * 获取默认命名空间（从环境变量配置）
+ */
+export function getDefaultNamespace() {
+    return k8sConfig.namespace
+}
+
 // =========================================
 // 运行模式检测
 // =========================================
@@ -165,6 +172,9 @@ async function initApiClient() {
 // 获取 API 路径
 function getApiPath(kind, namespace) {
     const paths = {
+        // 集群级资源（不需要 namespace）
+        Namespace: `/api/v1/namespaces`,
+        // 命名空间级资源
         Deployment: `/apis/apps/v1/namespaces/${namespace}/deployments`,
         StatefulSet: `/apis/apps/v1/namespaces/${namespace}/statefulsets`,
         Service: `/api/v1/namespaces/${namespace}/services`,
