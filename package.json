@@ -27,6 +27,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "download-schemas": "npx tsx scripts/download-schemas.ts",
+    "scan-immutables": "npx tsx scripts/scan-immutables.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -8,27 +8,32 @@
     </div>
     
     <div class="property-panel__content" v-if="selectedNode">
+      <!-- Edit Mode 提示 -->
+      <div v-if="editMode === 'edit'" class="edit-mode-banner">
+        🔒 编辑模式：部分字段不可修改
+      </div>
+      
       <!-- 通用元数据 -->
       <CollapsibleSection title="📋 元数据 (Metadata)" :defaultExpanded="true">
         <div class="form-group">
           <label class="form-label">名称 *</label>
-          <input
+          <LockedInput
             type="text"
-            class="form-input"
             v-model="localData.name"
-            @input="emitUpdate('name', localData.name)"
+            :editability="fieldLocking.checkField('name')"
             placeholder="my-resource"
+            @update:modelValue="v => emitUpdate('name', v)"
           />
         </div>
         
         <!-- Namespace 是集群级资源，不需要显示 namespace 字段 -->
         <div class="form-group" v-if="nodeType !== 'namespace'">
           <label class="form-label">命名空间</label>
-          <input
+          <LockedInput
             type="text"
-            class="form-input"
             v-model="localData.namespace"
-            @input="emitUpdate('namespace', localData.namespace)"
+            :editability="fieldLocking.checkField('namespace')"
+            @update:modelValue="v => emitUpdate('namespace', v)"
           />
         </div>
         
@@ -143,13 +148,13 @@
               />
             </div>
             <div class="form-group">
-              <label class="form-label">Service 名称 *</label>
-              <input
+              <label class="form-label">Service 名称 * 🔒</label>
+              <LockedInput
                 type="text"
-                class="form-input"
                 v-model="localData.serviceName"
-                @input="emitUpdate('serviceName', localData.serviceName)"
+                :editability="fieldLocking.checkField('serviceName')"
                 placeholder="headless-svc"
+                @update:modelValue="v => emitUpdate('serviceName', v)"
               />
             </div>
           </div>
@@ -359,18 +364,19 @@
       <template v-if="nodeType === 'secret'">
         <CollapsibleSection title="🔐 Secret 配置" :defaultExpanded="true">
           <div class="form-group">
-            <label class="form-label">类型</label>
-            <select 
-              class="form-select" 
+            <label class="form-label">类型 🔒</label>
+            <LockedInput
+              type="select"
               v-model="localData.secretType"
-              @change="emitUpdate('secretType', localData.secretType)"
+              :editability="fieldLocking.checkField('secretType')"
+              @update:modelValue="v => emitUpdate('secretType', v)"
             >
               <option value="Opaque">Opaque</option>
               <option value="kubernetes.io/tls">TLS</option>
               <option value="kubernetes.io/dockerconfigjson">Docker Config</option>
               <option value="kubernetes.io/basic-auth">Basic Auth</option>
               <option value="kubernetes.io/ssh-auth">SSH Auth</option>
-            </select>
+            </LockedInput>
           </div>
           
           <div class="form-group">
@@ -387,24 +393,26 @@
       <template v-if="nodeType === 'pvc'">
         <CollapsibleSection title="💾 PVC 配置" :defaultExpanded="true">
           <div class="form-group">
-            <label class="form-label">存储大小</label>
-            <input
+            <label class="form-label">存储大小 ⚠️</label>
+            <LockedInput
               type="text"
-              class="form-input"
               v-model="localData.storage"
-              @input="emitUpdate('storage', localData.storage)"
+              :editability="fieldLocking.checkField('storage')"
               placeholder="10Gi"
+              @update:modelValue="v => emitUpdate('storage', v)"
             />
+            <small v-if="editMode === 'edit'" class="hint warning-hint">⚠️ 编辑时仅支持扩容，不可缩小</small>
           </div>
           
           <div class="form-group">
-            <label class="form-label">访问模式</label>
-            <div class="checkbox-group">
+            <label class="form-label">访问模式 🔒</label>
+            <div class="checkbox-group" :class="{ 'checkbox-group--locked': !fieldLocking.canEdit('accessModes') }">
               <label class="checkbox-label">
                 <input 
                   type="checkbox" 
                   v-model="localData.accessModes" 
                   value="ReadWriteOnce"
+                  :disabled="!fieldLocking.canEdit('accessModes')"
                   @change="emitUpdate('accessModes', localData.accessModes)"
                 />
                 ReadWriteOnce
@@ -414,6 +422,7 @@
                   type="checkbox" 
                   v-model="localData.accessModes" 
                   value="ReadOnlyMany"
+                  :disabled="!fieldLocking.canEdit('accessModes')"
                   @change="emitUpdate('accessModes', localData.accessModes)"
                 />
                 ReadOnlyMany
@@ -423,21 +432,23 @@
                   type="checkbox" 
                   v-model="localData.accessModes" 
                   value="ReadWriteMany"
+                  :disabled="!fieldLocking.canEdit('accessModes')"
                   @change="emitUpdate('accessModes', localData.accessModes)"
                 />
                 ReadWriteMany
               </label>
+              <small v-if="!fieldLocking.canEdit('accessModes')" class="locked-hint">🔒 此字段不可变</small>
             </div>
           </div>
           
           <div class="form-group">
-            <label class="form-label">存储类</label>
-            <input
+            <label class="form-label">存储类 🔒</label>
+            <LockedInput
               type="text"
-              class="form-input"
               v-model="localData.storageClassName"
-              @input="emitUpdate('storageClassName', localData.storageClassName)"
+              :editability="fieldLocking.checkField('storageClassName')"
               placeholder="留空使用默认"
+              @update:modelValue="v => emitUpdate('storageClassName', v)"
             />
           </div>
         </CollapsibleSection>
@@ -577,6 +588,8 @@ import ContainerEditor from './editors/ContainerEditor.vue'
 import VolumeEditor from './editors/VolumeEditor.vue'
 import ServicePortEditor from './editors/ServicePortEditor.vue'
 import IngressRuleEditor from './editors/IngressRuleEditor.vue'
+import LockedInput from './editors/LockedInput.vue'
+import { useFieldLocking, getEditMode } from '../composables/useFieldLocking'
 
 const props = defineProps({
   selectedNode: {
@@ -592,6 +605,34 @@ const props = defineProps({
 const emit = defineEmits(['update', 'close', 'delete'])
 
 const nodeType = computed(() => props.selectedNode?.type || '')
+
+// Determine edit mode based on whether resource exists in cluster
+const editMode = computed(() => {
+  const resource = props.selectedNode?.data?.resource
+  return getEditMode(resource)
+})
+
+// Normalized kind for immutability checking
+const resourceKind = computed(() => {
+  const type = nodeType.value
+  const kindMap = {
+    deployment: 'Deployment',
+    statefulset: 'StatefulSet',
+    service: 'Service',
+    ingress: 'Ingress',
+    configmap: 'ConfigMap',
+    secret: 'Secret',
+    pvc: 'PersistentVolumeClaim',
+    job: 'Job',
+    cronjob: 'CronJob',
+    pod: 'Pod',
+    namespace: 'Namespace',
+  }
+  return kindMap[type] || type
+})
+
+// Field locking composable
+const fieldLocking = useFieldLocking(resourceKind, editMode)
 
 const localData = ref({})
 
@@ -813,4 +854,44 @@ function updateTls() {
   padding-top: 16px;
   border-top: 1px solid var(--border-default);
 }
+
+/* Edit Mode Banner */
+.edit-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-sm);
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Locked Checkbox Group */
+.checkbox-group--locked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.checkbox-group--locked .checkbox-label {
+  cursor: not-allowed;
+}
+
+/* Lock hints */
+.locked-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Warning hint */
+.warning-hint {
+  color: #fbbf24 !important;
+}
 </style>
+
+

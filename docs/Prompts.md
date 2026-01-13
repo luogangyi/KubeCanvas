@@ -388,7 +388,7 @@ K8s的配置文件拆成2个，一个是example文件，存放配置的填写说
 从鼠标悬浮到提示双击延迟有点高，缩短延迟
 ```
 
-# day 5
+# day 5 重点优化保存-恢复的逻辑
 
 - 遇到一个问题，我保存的组合，如果是在default ns下的，就能查询出来，进行恢复。如果是新建的ns，就查询不出来。所以这里先问下实现逻辑
 ```
@@ -440,4 +440,93 @@ Namespace 容器内资源位置问题已测试通过。有两个优化的点1）
 
 ```
 功能正常，但是还需要进一步优化，1）恢复出来的资源组件，看上去是以其中一个来定位的，如果两个组件并排时，就会出现偏向一侧，需要根据组件排列，选择最中间位置的组件或者2个组件的中间位置。 2）组件之间的连线还是不够美观，比如出现并排的两个组件的连线，从左边组件的上方连到了右边组件的下方，而没有就近的选择左边组件的右边连到右边组件的左边。3）不同组件的分层，建议Ingress最上方，然后下方第二层是Service，第三层是Deployment、Statefulset、job、cronjob，第四层是pod，第五层是pvc、configmap、secret，如果恢复的时候没有这一层，那就跳过，下面的向上移动一层
+```
+
+
+# day 6 优化组件修改的逻辑
+
+- 先求助一下gemini，问他如何处理不可修改的字段(接着之前的上下文)
+
+```我还需要梳理出K8s这些资源中，所有不允许修改的字段，即创建后，无法通过patch修改的字段，请给出方案```
+
+
+- gemini给了一段Prompt，现在输入到opus中
+```
+# Role: Kubernetes Schema Expert & Tooling Engineer
+
+我正在开发 KubeCanvas 编辑器。我们需要处理 **"Edit Mode" (修改模式)** 下的字段锁定逻辑。
+Kubernetes 中有很多字段在创建后是 **不可变 (Immutable)** 的（例如 `metadata.name`, `StatefulSet` 的 `volumeClaimTemplates`）。
+
+请帮我完成以下两件事：
+
+## Task 1: 编写 Schema 扫描脚本 (`scripts/scan-immutables.ts`)
+编写一个 Node.js 脚本，读取 `src/test/schemas/` 目录下下载的 K8s JSON Schema 文件，自动分析并提取可能的不可变字段。
+
+**扫描策略：**
+1. 遍历 Schema 中的所有属性。
+2. 检查 `description` 字段是否包含以下关键词（不区分大小写）：
+   - "Immutable"
+   - "Cannot be updated"
+   - "Cannot be modified"
+   - "Replacement required"
+3. (可选) 检查是否有 `x-kubernetes-immutable: true` 属性。
+4. 输出一个 JSON 报告，格式如下：
+   ```json
+   {
+     "Deployment": ["metadata.name", "metadata.namespace", "spec.selector"],
+     "StatefulSet": ["spec.volumeClaimTemplates", "spec.serviceName", ...]
+   }
+```
+
+- opus给我整理了一个immutables-report.json文件，包含了K8s中各种资源的不可变字段，接着让opus生成一个常量配置
+
+```
+基于刚才生成的immutables-report.json中的不可变字段以及你对 Kubernetes 的专业知识（弥补自动化扫描可能漏掉的部分），请直接为我生成一份 TypeScript 常量配置。
+
+要求：
+
+定义一个对象 IMMUTABLE_PATHS。
+
+Key 为资源 Kind (如 Deployment, Service)。
+
+Value 为不可变字段的路径数组 (使用 lodash 风格的点分路径)。
+```
+
+```
+编写一个 React Hook 或工具函数： isFieldEditable(kind: string, path: string, mode: 'create' | 'edit'): boolean
+
+逻辑：
+
+如果 mode === 'create'，永远返回 true。
+
+如果 mode === 'edit'，检查 path 是否存在于 IMMUTABLE_PATHS[kind] 或 IMMUTABLE_PATHS['Common'] 中。
+
+如果是 PVC 的 resources.requests.storage，这是一个特殊情况（只能变大），暂时标记为 true（可编辑），但在 UI 上添加注释 "Only expansion allowed"。
+```
+
+```
+对一个恢复的组合，其中各个资源组件中，有很多字段是不允许修改的，根据前面的isFieldEditable方法，来设置资源中属性的可编辑状态。
+UI 交互设计建议
+
+在前端实现时，不要仅仅把 Input 设为 `disabled`，建议给用户明确的反馈：
+
+1.  **视觉锁定**：将输入框置灰，并显示锁头图标 🔒。
+2.  **Tooltip 提示**：当鼠标悬停在锁定的 Deployment Selector 上时，提示：
+    > *"Field is immutable. To change this, you must delete and recreate the resource."*
+    > *(此字段不可变。如需修改，请删除并重建资源。)*
+3.  **特殊处理 (Recreate 模式)**：
+    对于必须修改不可变字段的场景（例如重命名资源），你可以设计一个 "Clone & Recreate" 按钮：
+    * 读取当前 YAML。
+    * 清除 `metadata.resourceVersion`, `uid`, `creationTimestamp`。
+    * 修改不可变字段。
+    * 删除旧资源 -> 创建新资源 (注意这会导致服务中断，需给用户红色警告)。
+```
+
+```
+遍历所有K8s中的所有资源和字段，对比immutables-report.json文件，对于不可变字段，添加LockedInput处理
+```
+
+```
+1)对一个恢复的组合，如果添加新的组件，点击保存，应该不再需要填入组合名称（应该直接复用之前的组合名称），另外，应该只提交更新的部分（比如新增的组件，或之前组件的修改（修改应该调用patch接口）。
+2)对一个恢复的组合，其中各个资源组件中，有很多字段是不允许修改的，这些不允许置灰的字段，应该根据K8s接口规范来。
 ```
