@@ -208,7 +208,7 @@ function stopResize() {
   color: #e5e7eb;
 }
 
-/* 容器区域 */
+/* 容器区域 - 允许点击穿透到内部的其他组件 */
 .namespace-node__body {
   flex: 1;
   display: flex;
@@ -216,6 +216,7 @@ function stopResize() {
   justify-content: center;
   padding: 20px;
   min-height: 100px;
+  pointer-events: none; /* 允许点击穿透到内部组件 */
 }
 
 .namespace-node__hint {

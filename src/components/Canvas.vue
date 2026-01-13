@@ -15,7 +15,7 @@
     <div 
       class="connector-brush"
       draggable="false"
-      @mousedown="startConnectorDrag"
+      @click="activateBrush"
       :class="{ 'active': isConnecting }"
       @mouseenter="showBrushTooltip = true"
       @mouseleave="showBrushTooltip = false"
@@ -28,17 +28,17 @@
     
     <!-- 画笔 Tooltip -->
     <div v-if="showBrushTooltip && !isConnecting" class="brush-tooltip">
-      拖拽到节点上进行连线
+      点击激活，然后点击节点连线
     </div>
     
     <!-- 连线提示 -->
     <div v-if="isConnecting" class="connection-status">
       <template v-if="connectionSource">
-        🔗 从 <strong>{{ connectionSource.data.name }}</strong> 拖动到目标节点
+        🔗 已选中 <strong>{{ connectionSource.data.name }}</strong>，点击目标节点完成连线
         <span class="cancel-hint">(ESC 或右键取消)</span>
       </template>
       <template v-else>
-        ✏️ 拖动到源节点上开始...
+        ✏️ 点击一个节点作为起点
         <span class="cancel-hint">(ESC 或右键取消)</span>
       </template>
     </div>
@@ -89,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, markRaw, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, markRaw, watch, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -176,13 +176,38 @@ const edges = ref([])
 watch([() => props.initialNodes, () => props.initialEdges], ([newNodes, newEdges]) => {
   // 只有当新数据不为空时才更新（避免初始化时清空）
   if (newNodes && newNodes.length > 0) {
+    // 先清空旧数据，再加载新数据
+    edges.value = [] // 必须先清空边，避免引用旧节点 ID
     // 使用深拷贝避免响应式问题
     nodes.value = JSON.parse(JSON.stringify(newNodes))
     console.log('Loaded nodes:', nodes.value.length)
-  }
-  if (newEdges && newEdges.length > 0) {
-    edges.value = JSON.parse(JSON.stringify(newEdges))
-    console.log('Loaded edges:', edges.value.length)
+    
+    // 边在节点之后加载
+    if (newEdges && newEdges.length >= 0) {
+      edges.value = JSON.parse(JSON.stringify(newEdges))
+      console.log('Loaded edges:', edges.value.length)
+    }
+    
+    // 延迟一帧后重置视口到画布起点
+    nextTick(() => {
+      if (vueFlowRef.value) {
+        // 等待 Vue Flow 内部渲染完成后，再调整视口位置
+        setTimeout(() => {
+          if (vueFlowRef.value) {
+            // 直接使用 fitView 然后立即偏移
+            vueFlowRef.value.fitView({ padding: 0.15 })
+            
+            // 获取当前视口并向左偏移
+            const viewport = vueFlowRef.value.getViewport()
+            vueFlowRef.value.setViewport({
+              x: viewport.x + 200,
+              y: viewport.y,
+              zoom: viewport.zoom
+            })
+          }
+        }, 500) // 延迟更长时间确保渲染完成
+      }
+    })
   }
 }, { deep: true })
 
@@ -226,13 +251,18 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleGlobalKeyDown)
 })
 
-// 开始连线画笔拖拽
-function startConnectorDrag(event) {
-  isConnecting.value = true
-  connectionSource.value = null
-  mousePosition.value = { x: event.clientX, y: event.clientY }
-  isHandleDrag.value = false
-  event.preventDefault()
+// 激活/关闭连线画笔模式
+function activateBrush() {
+  if (isConnecting.value) {
+    // 已激活，则关闭
+    cancelConnection()
+  } else {
+    // 激活画笔模式
+    isConnecting.value = true
+    connectionSource.value = null
+    mousePosition.value = null
+    isHandleDrag.value = false
+  }
 }
 
 // 从 handle 开始连线（Vue Flow 原生事件）
@@ -274,21 +304,7 @@ function onMouseMove(event) {
   if (isConnecting.value) {
     mousePosition.value = { x: event.clientX, y: event.clientY }
     
-    // 画笔模式下：如果还没有源节点，检查是否经过了某个节点
-    if (!isHandleDrag.value && !connectionSource.value) {
-      const nodeUnderMouse = findNodeAtPosition(event.clientX, event.clientY)
-      if (nodeUnderMouse) {
-        // 自动将经过的第一个节点设为源节点
-        connectionSource.value = nodeUnderMouse
-        // 检查是否悬停在某个 handle 上，设置为源 handle
-        const handleInfo = findHandleAtPosition(event.clientX, event.clientY)
-        if (handleInfo && handleInfo.nodeId === nodeUnderMouse.id) {
-          sourceHandleId.value = handleInfo.handleId
-        }
-      }
-    }
-    
-    // 检测是否悬停在目标节点的 handle 上
+    // 检测是否悬停在目标节点的 handle 上（只在有源节点时）
     if (connectionSource.value) {
       const handleInfo = findHandleAtPosition(event.clientX, event.clientY)
       if (handleInfo && handleInfo.nodeId !== connectionSource.value.id) {
@@ -301,8 +317,11 @@ function onMouseMove(event) {
 }
 
 // 根据鼠标位置找到节点 - 支持整个节点区域
+// 优先选择非 Namespace 节点，避免容器遮挡内部组件
 function findNodeAtPosition(x, y) {
   const nodeElements = document.querySelectorAll('.vue-flow__node')
+  const matchedNodes = []
+  
   for (const el of nodeElements) {
     const rect = el.getBoundingClientRect()
     // 扩大检测区域，更容易选中
@@ -312,10 +331,24 @@ function findNodeAtPosition(x, y) {
         y >= rect.top - padding && 
         y <= rect.bottom + padding) {
       const nodeId = el.getAttribute('data-id')
-      return findNode(nodeId)
+      const node = findNode(nodeId)
+      if (node) {
+        matchedNodes.push({ node, area: rect.width * rect.height })
+      }
     }
   }
-  return null
+  
+  // 如果有多个匹配节点，优先选择非 Namespace 节点（面积较小的）
+  if (matchedNodes.length > 1) {
+    // 先按类型排序（非 namespace 优先），再按面积排序（小的优先）
+    matchedNodes.sort((a, b) => {
+      if (a.node.type === 'namespace' && b.node.type !== 'namespace') return 1
+      if (a.node.type !== 'namespace' && b.node.type === 'namespace') return -1
+      return a.area - b.area
+    })
+  }
+  
+  return matchedNodes.length > 0 ? matchedNodes[0].node : null
 }
 
 // 根据鼠标位置找到 handle
@@ -733,7 +766,7 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
     target: targetNode.id,
     sourceHandle: finalSourceHandle,
     targetHandle: finalTargetHandle,
-    animated: true,
+    animated: false, // 实线样式
     style: {
       stroke: getResourceTypeConfig(sourceNode.type)?.color || '#3b82f6'
     }
@@ -766,16 +799,33 @@ function onEdgesChange(changes) {
 
 // 节点点击
 function onNodeClick({ node }) {
-  if (!isConnecting.value) {
-    // Namespace 节点点击时取消选中，以便内部组件可以被选中
-    // 如果需要编辑 Namespace，双击可以打开属性面板
-    if (node.type === 'namespace') {
-      // 取消 Namespace 的选中状态
-      removeSelectedNodes([node])
-      return
+  // 画笔连线模式
+  if (isConnecting.value) {
+    if (!connectionSource.value) {
+      // 第一次点击：选择源节点
+      connectionSource.value = node
+      // 获取可能的源 handle
+      const handleInfo = findHandleAtPosition(mousePosition.value?.x || 0, mousePosition.value?.y || 0)
+      if (handleInfo && handleInfo.nodeId === node.id) {
+        sourceHandleId.value = handleInfo.handleId
+      }
+    } else if (node.id !== connectionSource.value.id) {
+      // 第二次点击不同节点：创建连接
+      createConnection(connectionSource.value, node)
+      cancelConnection()
     }
-    emit('nodeSelect', node)
+    return
   }
+  
+  // 正常模式
+  // Namespace 节点点击时取消选中，以便内部组件可以被选中
+  // 如果需要编辑 Namespace，双击可以打开属性面板
+  if (node.type === 'namespace') {
+    // 取消 Namespace 的选中状态
+    removeSelectedNodes([node])
+    return
+  }
+  emit('nodeSelect', node)
 }
 
 // 节点双击 - 用于选中 Namespace 进行编辑
@@ -786,7 +836,13 @@ function onNodeDoubleClick({ node }) {
 // 画布点击
 function onPaneClick() {
   if (isConnecting.value) {
-    if (!connectionSource.value) {
+    // 画布空白处点击：如果有源节点则取消选择源节点，否则退出画笔模式
+    if (connectionSource.value) {
+      // 取消已选择的源节点，但保持画笔模式
+      connectionSource.value = null
+      sourceHandleId.value = null
+    } else {
+      // 退出画笔模式
       cancelConnection()
     }
   } else {

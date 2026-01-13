@@ -190,6 +190,12 @@ function getApiPath(kind, namespace) {
 }
 
 // =========================================
+// ConfigMap 注册表配置
+// =========================================
+const REGISTRY_CONFIGMAP_NAME = 'kubecanvas-compositions'
+const REGISTRY_CONFIGMAP_NAMESPACE = 'default' // 固定在 default 命名空间
+
+// =========================================
 // K8s API 组合函数
 // =========================================
 
@@ -197,6 +203,106 @@ export function useK8sApi() {
     // 获取当前命名空间
     function getNamespace() {
         return effectiveConfig?.namespace || k8sConfig.namespace || 'default'
+    }
+
+    // =========================================
+    // ConfigMap 注册表操作
+    // =========================================
+
+    // 读取 compositions 注册表
+    async function getCompositionsRegistry() {
+        const client = await initApiClient()
+        const path = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps/${REGISTRY_CONFIGMAP_NAME}`
+
+        try {
+            const response = await client.get(path)
+            const data = response.data.data?.compositions
+            return data ? JSON.parse(data) : {}
+        } catch (error) {
+            if (error.response?.status === 404) {
+                // ConfigMap 不存在，返回空对象
+                return {}
+            }
+            throw error
+        }
+    }
+
+    // 更新 compositions 注册表（添加或更新条目）
+    async function updateCompositionsRegistry(compositionId, namespace, resourceCount = 0, name = '') {
+        const client = await initApiClient()
+        const path = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps/${REGISTRY_CONFIGMAP_NAME}`
+
+        // 先读取现有数据
+        let registry = {}
+        let exists = false
+
+        try {
+            const response = await client.get(path)
+            exists = true
+            const data = response.data.data?.compositions
+            registry = data ? JSON.parse(data) : {}
+        } catch (error) {
+            if (error.response?.status !== 404) {
+                throw error
+            }
+        }
+
+        // 添加/更新条目（包含自定义名称）
+        registry[compositionId] = {
+            namespace,
+            resourceCount,
+            name: name || compositionId,
+            updatedAt: new Date().toISOString()
+        }
+
+        const configMap = {
+            apiVersion: 'v1',
+            kind: 'ConfigMap',
+            metadata: {
+                name: REGISTRY_CONFIGMAP_NAME,
+                namespace: REGISTRY_CONFIGMAP_NAMESPACE
+            },
+            data: {
+                compositions: JSON.stringify(registry)
+            }
+        }
+
+        if (exists) {
+            await client.put(path, configMap)
+        } else {
+            await client.post(`/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps`, configMap)
+        }
+
+        return registry
+    }
+
+    // 从注册表中移除条目
+    async function removeFromRegistry(compositionId) {
+        const client = await initApiClient()
+        const path = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps/${REGISTRY_CONFIGMAP_NAME}`
+
+        try {
+            const response = await client.get(path)
+            const data = response.data.data?.compositions
+            const registry = data ? JSON.parse(data) : {}
+
+            delete registry[compositionId]
+
+            const configMap = {
+                ...response.data,
+                data: {
+                    compositions: JSON.stringify(registry)
+                }
+            }
+
+            await client.put(path, configMap)
+            return registry
+        } catch (error) {
+            if (error.response?.status === 404) {
+                return {}
+            }
+            throw error
+        }
     }
 
     // 创建资源
@@ -263,11 +369,17 @@ export function useK8sApi() {
         return response.data.items
     }
 
-    // 查询所有资源组合
+    // 查询指定组合的所有资源
     async function getCompositionResources(compositionId, namespace) {
-        const ns = namespace || getNamespace()
+        // 如果未提供 namespace，从注册表查询
+        let ns = namespace
+        if (!ns) {
+            const registry = await getCompositionsRegistry()
+            ns = registry[compositionId]?.namespace || getNamespace()
+        }
+
         const labelSelector = `kubecanvas.io/composition=${compositionId}`
-        const kinds = ['Deployment', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
+        const kinds = ['Namespace', 'Deployment', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
 
         const allResources = []
 
@@ -297,37 +409,17 @@ export function useK8sApi() {
         return allResources
     }
 
-    // 获取所有资源组合列表
-    async function listCompositions(namespace) {
-        const ns = namespace || getNamespace()
-        const labelSelector = 'kubecanvas.io/managed-by=kubecanvas'
-        const compositions = new Map()
+    // 获取所有资源组合列表（从 ConfigMap 注册表读取）
+    async function listCompositions() {
+        const registry = await getCompositionsRegistry()
 
-        const kinds = ['Deployment', 'StatefulSet', 'Service']
-
-        for (const kind of kinds) {
-            try {
-                const resources = await getResourcesByLabel(kind, labelSelector, ns)
-                for (const resource of resources) {
-                    const compositionId = resource.metadata.labels?.['kubecanvas.io/composition']
-                    if (compositionId && !compositions.has(compositionId)) {
-                        compositions.set(compositionId, {
-                            id: compositionId,
-                            name: compositionId,
-                            createdAt: resource.metadata.creationTimestamp,
-                            resourceCount: 0
-                        })
-                    }
-                    if (compositionId) {
-                        compositions.get(compositionId).resourceCount++
-                    }
-                }
-            } catch (error) {
-                console.warn(`Failed to list ${kind}:`, error.message)
-            }
-        }
-
-        return Array.from(compositions.values())
+        return Object.entries(registry).map(([id, info]) => ({
+            id,
+            name: info.name || id, // 使用自定义名称
+            namespace: info.namespace,
+            resourceCount: info.resourceCount || 0,
+            updatedAt: info.updatedAt
+        }))
     }
 
     // 更新资源
@@ -402,6 +494,10 @@ export function useK8sApi() {
         deleteComposition,
         getConfigInfo,
         getNamespace,
+        // ConfigMap 注册表操作
+        getCompositionsRegistry,
+        updateCompositionsRegistry,
+        removeFromRegistry,
         config: k8sConfig
     }
 }
