@@ -563,3 +563,6 @@ docker run -p 8080:80 \
 docker日志报2026/01/14 14:09:17 [error] 11#11: *3 access forbidden by rule, client: 192.168.215.1, server: _, request: "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1", host: "localhost:8080"
 ```
 
+
+
+# day 8

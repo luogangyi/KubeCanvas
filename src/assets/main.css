@@ -1,10 +1,12 @@
-/* KubeCanvas - 深色科技风格主题 */
-/* Dark Glassmorphism Theme with Neon Blue Accents */
+/* KubeCanvas - 深色/亮色科技风格主题 */
+/* Supports Dark and Light themes with CSS variables */
 
 /* ===== 字体导入 ===== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-:root {
+/* ===== 暗色主题 (默认) ===== */
+:root,
+[data-theme="dark"] {
   /* ===== 背景层次 ===== */
   --bg-primary: #0a0e17;
   --bg-secondary: #0f1419;
@@ -77,6 +79,64 @@
   --transition-slow: 400ms ease;
 }
 
+/* ===== 亮色主题 ===== */
+[data-theme="light"] {
+  /* ===== 背景层次 ===== */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --bg-elevated: #ffffff;
+
+  /* ===== 蓝色强调色 ===== */
+  --accent-primary: #2563eb;
+  --accent-light: #3b82f6;
+  --accent-dim: #dbeafe;
+  --accent-glow: rgba(37, 99, 235, 0.3);
+
+  /* ===== 文字颜色 ===== */
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  /* ===== 边框 ===== */
+  --border-default: rgba(37, 99, 235, 0.2);
+  --border-hover: rgba(37, 99, 235, 0.35);
+  --border-active: rgba(37, 99, 235, 0.5);
+
+  /* ===== 资源类型颜色 (略微调暗以增加对比度) ===== */
+  --color-deployment: #2563eb;
+  --color-statefulset: #9333ea;
+  --color-pod: #0e7490;
+  --color-service: #15803d;
+  --color-ingress: #c2410c;
+  --color-configmap: #b45309;
+  --color-secret: #b91c1c;
+  --color-pvc: #4338ca;
+  --color-job: #047857;
+  --color-cronjob: #be185d;
+
+  /* ===== 功能色 ===== */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+
+  /* ===== 玻璃效果 ===== */
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(37, 99, 235, 0.15);
+  --glass-blur: blur(20px);
+
+  /* ===== 发光效果 (减弱) ===== */
+  --glow-sm: 0 0 8px rgba(37, 99, 235, 0.15);
+  --glow-md: 0 0 15px rgba(37, 99, 235, 0.2);
+  --glow-lg: 0 0 25px rgba(37, 99, 235, 0.25);
+
+  /* ===== 阴影 (灰色代替黑色) ===== */
+  --shadow-sm: 0 2px 8px rgba(100, 116, 139, 0.15);
+  --shadow-md: 0 8px 24px rgba(100, 116, 139, 0.2);
+  --shadow-lg: 0 16px 48px rgba(100, 116, 139, 0.25);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -97,6 +157,14 @@ body {
   background:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
     radial-gradient(ellipse 60% 40% at 100% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+    var(--bg-primary);
+}
+
+/* 亮色主题 #app 背景 */
+[data-theme="light"] #app {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(37, 99, 235, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(37, 99, 235, 0.05) 0%, transparent 40%),
     var(--bg-primary);
 }
 
