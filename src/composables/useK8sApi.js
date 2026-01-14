@@ -438,6 +438,47 @@ export function useK8sApi() {
         return response.data
     }
 
+    // Patch 资源 (strategic merge patch)
+    async function patchResource(resource) {
+        const client = await initApiClient()
+        const kind = resource.kind
+        const name = resource.metadata.name
+        const namespace = resource.metadata?.namespace || getNamespace()
+        const path = getApiPath(kind, namespace)
+
+        if (!path) {
+            throw new Error(`Unsupported resource kind: ${kind}`)
+        }
+
+        // 移除不应该在 patch 中发送的字段
+        const patchData = {
+            ...resource,
+            metadata: {
+                ...resource.metadata,
+                // 保留 resourceVersion 以支持乐观锁
+                resourceVersion: resource.metadata.resourceVersion || undefined,
+                // 移除只读字段
+                uid: undefined,
+                creationTimestamp: undefined,
+                managedFields: undefined,
+                selfLink: undefined,
+                generation: undefined
+            }
+        }
+
+        // 清理 undefined 字段
+        Object.keys(patchData.metadata).forEach(key => {
+            if (patchData.metadata[key] === undefined) {
+                delete patchData.metadata[key]
+            }
+        })
+
+        const response = await client.patch(`${path}/${name}`, patchData, {
+            headers: { 'Content-Type': 'application/strategic-merge-patch+json' }
+        })
+        return response.data
+    }
+
     // 删除资源
     async function deleteResource(kind, name, namespace) {
         const client = await initApiClient()
@@ -490,6 +531,7 @@ export function useK8sApi() {
         getCompositionResources,
         listCompositions,
         updateResource,
+        patchResource,
         deleteResource,
         deleteComposition,
         getConfigInfo,

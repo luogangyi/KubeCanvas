@@ -14,8 +14,8 @@
         <button class="btn btn-secondary" @click="refreshCompositions">
           🔄 刷新
         </button>
-        <button class="btn btn-primary" @click="showSaveDialog = true" :disabled="saving || loading">
-          💾 保存到 K8s
+        <button class="btn btn-primary" @click="handleSaveClick" :disabled="saving || loading">
+          💾 {{ currentCompositionName ? '保存更新' : '保存到 K8s' }}
         </button>
       </div>
     </header>
@@ -80,13 +80,19 @@ import LoadingOverlay from './components/LoadingOverlay.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
 
-const { createResources, listCompositions, getCompositionResources, updateCompositionsRegistry } = useK8sApi()
+const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, patchResource, deleteResource } = useK8sApi()
 
 // 画布引用
 const canvasRef = ref(null)
 
 // 当前资源组合 ID
 const currentCompositionId = ref(generateCompositionLabel())
+
+// 当前组合名称（恢复的组合才有）
+const currentCompositionName = ref('')
+
+// 原始资源快照（用于增量更新比较）
+const originalResources = ref([])
 
 // 已保存的资源组合列表
 const compositions = ref([])
@@ -171,11 +177,148 @@ function closePanel() {
 }
 
 // 删除选中节点
-function deleteSelectedNode() {
-  if (selectedNode.value && canvasRef.value) {
-    canvasRef.value.deleteNode(selectedNode.value.id)
-    selectedNode.value = null
+async function deleteSelectedNode() {
+  if (!selectedNode.value || !canvasRef.value) return
+  
+  const nodeToDelete = selectedNode.value
+  const resource = nodeToDelete.data?.resource
+  
+  // 检查引用关系
+  const referenceCheck = checkResourceReferences(nodeToDelete)
+  if (referenceCheck.isReferenced) {
+    showToast(`无法删除：${resource?.metadata?.name} 正在被 ${referenceCheck.referencedBy.join(', ')} 引用`, 'error')
+    return
   }
+  
+  // 如果是已保存的资源（有 resourceVersion），从 K8s 删除
+  if (currentCompositionName.value && resource?.metadata?.resourceVersion) {
+    try {
+      loading.value = true
+      loadingMessage.value = '删除资源中...'
+      loadingProgress.value = 30
+      loadingSuccess.value = false
+      
+      await deleteResource(resource.kind, resource.metadata.name, resource.metadata.namespace)
+      
+      loadingProgress.value = 100
+      loadingSuccess.value = true
+      successMessage.value = `已删除 ${resource.kind}/${resource.metadata.name}`
+      
+      // 从原始资源快照中移除
+      const resourceKey = r => `${r.kind}/${r.metadata?.namespace || ''}/${r.metadata?.name || ''}`
+      const keyToRemove = resourceKey(resource)
+      originalResources.value = originalResources.value.filter(r => resourceKey(r) !== keyToRemove)
+      
+      setTimeout(() => {
+        loading.value = false
+      }, 1000)
+    } catch (error) {
+      loading.value = false
+      // 404 表示资源已不存在，不算错误
+      if (error.response?.status !== 404) {
+        showToast(`删除失败: ${error.message}`, 'error')
+        console.error('Delete error:', error)
+        return
+      }
+    }
+  }
+  
+  // 从画布删除
+  canvasRef.value.deleteNode(nodeToDelete.id)
+  selectedNode.value = null
+  
+  // 更新注册表中的资源数量
+  if (currentCompositionName.value) {
+    const remainingNodes = canvasRef.value.getNodes()
+    const firstResource = remainingNodes.find(n => n.data?.resource?.metadata?.namespace)
+    const namespace = firstResource?.data?.resource?.metadata?.namespace || 'default'
+    await updateCompositionsRegistry(currentCompositionId.value, namespace, remainingNodes.length, currentCompositionName.value)
+    await refreshCompositions()
+  }
+  
+  if (!currentCompositionName.value) {
+    // 新组合，只显示本地删除提示
+    showToast('已从画布删除')
+  }
+}
+
+// 检查资源引用关系
+function checkResourceReferences(nodeToCheck) {
+  const nodes = canvasRef.value?.getNodes() || []
+  const edges = canvasRef.value?.getEdges() || []
+  const resource = nodeToCheck.data?.resource
+  const resourceName = resource?.metadata?.name
+  const resourceKind = resource?.kind
+  
+  const referencedBy = []
+  
+  // 检查边连接（如果有其他节点连接到这个节点）
+  const incomingEdges = edges.filter(e => e.target === nodeToCheck.id)
+  const outgoingEdges = edges.filter(e => e.source === nodeToCheck.id)
+  
+  // 检查具体引用关系
+  for (const node of nodes) {
+    if (node.id === nodeToCheck.id) continue
+    
+    const nodeResource = node.data?.resource
+    const nodeName = node.data?.name || nodeResource?.metadata?.name
+    
+    // 检查 ConfigMap 引用
+    if (resourceKind === 'ConfigMap') {
+      const volumes = getVolumes(nodeResource)
+      if (volumes.some(v => v.configMap?.name === resourceName)) {
+        referencedBy.push(nodeName)
+      }
+    }
+    
+    // 检查 Secret 引用
+    if (resourceKind === 'Secret') {
+      const volumes = getVolumes(nodeResource)
+      if (volumes.some(v => v.secret?.secretName === resourceName)) {
+        referencedBy.push(nodeName)
+      }
+    }
+    
+    // 检查 PVC 引用
+    if (resourceKind === 'PersistentVolumeClaim') {
+      const volumes = getVolumes(nodeResource)
+      if (volumes.some(v => v.persistentVolumeClaim?.claimName === resourceName)) {
+        referencedBy.push(nodeName)
+      }
+    }
+    
+    // 检查 Service 引用（Ingress -> Service）
+    if (resourceKind === 'Service' && nodeResource?.kind === 'Ingress') {
+      const rules = nodeResource.spec?.rules || []
+      for (const rule of rules) {
+        const paths = rule.http?.paths || []
+        if (paths.some(p => p.backend?.service?.name === resourceName)) {
+          referencedBy.push(nodeName)
+        }
+      }
+    }
+  }
+  
+  return {
+    isReferenced: referencedBy.length > 0,
+    referencedBy: [...new Set(referencedBy)] // 去重
+  }
+}
+
+// 获取资源的 volumes
+function getVolumes(resource) {
+  if (!resource) return []
+  
+  if (resource.kind === 'Pod') {
+    return resource.spec?.volumes || []
+  }
+  if (['Deployment', 'StatefulSet', 'DaemonSet', 'Job'].includes(resource.kind)) {
+    return resource.spec?.template?.spec?.volumes || []
+  }
+  if (resource.kind === 'CronJob') {
+    return resource.spec?.jobTemplate?.spec?.template?.spec?.volumes || []
+  }
+  return []
 }
 
 // 清空画布
@@ -183,8 +326,21 @@ function clearCanvas() {
   if (canvasRef.value) {
     canvasRef.value.clearCanvas()
     currentCompositionId.value = generateCompositionLabel()
+    currentCompositionName.value = '' // 重置组合名称
+    originalResources.value = [] // 清空原始资源
     selectedNode.value = null
     showToast('画布已清空')
+  }
+}
+
+// 点击保存按钮
+function handleSaveClick() {
+  if (currentCompositionName.value) {
+    // 已有组合名称，直接增量保存
+    handleIncrementalSave()
+  } else {
+    // 新组合，显示对话框
+    showSaveDialog.value = true
   }
 }
 
@@ -264,6 +420,155 @@ async function handleSaveConfirm(compositionName) {
   } finally {
     saving.value = false
   }
+}
+
+// 增量保存（用于恢复的组合）
+async function handleIncrementalSave() {
+  if (!canvasRef.value) return
+  
+  const currentResources = canvasRef.value.getAllResources(currentCompositionId.value)
+  
+  if (currentResources.length === 0) {
+    showToast('画布为空，请先添加资源', 'error')
+    return
+  }
+  
+  // 计算资源差异
+  const { toCreate, toPatch, unchanged } = diffResources(originalResources.value, currentResources)
+  
+  console.log('Resource diff:', { toCreate: toCreate.length, toPatch: toPatch.length, unchanged: unchanged.length })
+  
+  if (toCreate.length === 0 && toPatch.length === 0) {
+    showToast('没有需要保存的更改')
+    return
+  }
+  
+  // 显示加载覆盖层
+  loading.value = true
+  loadingMessage.value = '保存更新中...'
+  loadingProgress.value = 10
+  loadingSuccess.value = false
+  saving.value = true
+  
+  try {
+    const results = []
+    const errors = []
+    
+    // 1. 创建新资源（Namespace 优先）
+    const sortedToCreate = [...toCreate].sort((a, b) => {
+      if (a.kind === 'Namespace' && b.kind !== 'Namespace') return -1
+      if (a.kind !== 'Namespace' && b.kind === 'Namespace') return 1
+      return 0
+    })
+    
+    loadingProgress.value = 30
+    
+    for (const resource of sortedToCreate) {
+      try {
+        const result = await createResource(resource)
+        results.push({ type: 'create', resource: result })
+        console.log(`Created: ${resource.kind}/${resource.metadata.name}`)
+      } catch (error) {
+        errors.push({ type: 'create', resource, error: error.response?.data || error.message })
+        console.error(`Failed to create ${resource.kind}/${resource.metadata.name}:`, error)
+      }
+    }
+    
+    loadingProgress.value = 50
+    
+    // 2. Patch 修改的资源
+    for (const resource of toPatch) {
+      try {
+        const result = await patchResource(resource)
+        results.push({ type: 'patch', resource: result })
+        console.log(`Patched: ${resource.kind}/${resource.metadata.name}`)
+      } catch (error) {
+        errors.push({ type: 'patch', resource, error: error.response?.data || error.message })
+        console.error(`Failed to patch ${resource.kind}/${resource.metadata.name}:`, error)
+      }
+    }
+    
+    loadingProgress.value = 70
+    
+    if (errors.length === 0) {
+      // 更新注册表
+      const allResources = [...unchanged, ...results.map(r => r.resource)]
+      const firstResource = allResources.find(r => r.metadata?.namespace)
+      const namespace = firstResource?.metadata?.namespace || 'default'
+      await updateCompositionsRegistry(currentCompositionId.value, namespace, allResources.length, currentCompositionName.value)
+      
+      // 更新原始资源快照
+      originalResources.value = currentResources.map(r => JSON.parse(JSON.stringify(r)))
+      
+      loadingProgress.value = 100
+      loadingSuccess.value = true
+      successMessage.value = `已更新！创建 ${toCreate.length} 个，修改 ${toPatch.length} 个资源`
+      
+      setTimeout(() => {
+        loading.value = false
+      }, 1500)
+      
+      await refreshCompositions()
+    } else {
+      loading.value = false
+      showToast(`部分失败：${results.length} 成功，${errors.length} 失败`, 'error')
+      console.error('Failed resources:', errors)
+    }
+  } catch (error) {
+    loading.value = false
+    showToast(`保存失败: ${error.message}`, 'error')
+    console.error('Incremental save error:', error)
+  } finally {
+    saving.value = false
+  }
+}
+
+// 资源差异计算
+function diffResources(original, current) {
+  const resourceKey = (r) => `${r.kind}/${r.metadata?.namespace || ''}/${r.metadata?.name || ''}`
+  
+  const originalMap = new Map(original.map(r => [resourceKey(r), r]))
+  const currentMap = new Map(current.map(r => [resourceKey(r), r]))
+  
+  const toCreate = []
+  const toPatch = []
+  const unchanged = []
+  
+  for (const [key, resource] of currentMap) {
+    if (!originalMap.has(key)) {
+      // 新资源
+      toCreate.push(resource)
+    } else {
+      const originalResource = originalMap.get(key)
+      if (hasResourceChanged(originalResource, resource)) {
+        // 已修改
+        toPatch.push(resource)
+      } else {
+        // 未修改
+        unchanged.push(resource)
+      }
+    }
+  }
+  
+  return { toCreate, toPatch, unchanged }
+}
+
+// 检查资源是否已修改（比较 spec）
+function hasResourceChanged(original, current) {
+  // 比较 spec 部分（忽略 metadata 中的 resourceVersion 等）
+  const originalSpec = JSON.stringify(original.spec || {})
+  const currentSpec = JSON.stringify(current.spec || {})
+  
+  if (originalSpec !== currentSpec) return true
+  
+  // 对于 ConfigMap/Secret，比较 data
+  if (original.kind === 'ConfigMap' || original.kind === 'Secret') {
+    const originalData = JSON.stringify(original.data || original.stringData || {})
+    const currentData = JSON.stringify(current.data || current.stringData || {})
+    if (originalData !== currentData) return true
+  }
+  
+  return false
 }
 
 // 刷新资源组合列表
@@ -601,7 +906,15 @@ async function loadComposition(compositionId) {
     loadingSuccess.value = true
     successMessage.value = `成功恢复 ${resources.length} 个资源！`
     
+    // 保存原始资源快照和组合名称
+    originalResources.value = resources.map(r => JSON.parse(JSON.stringify(r)))
+    
+    // 从注册表获取组合名称
+    const registry = compositions.value.find(c => c.id === compositionId)
+    currentCompositionName.value = registry?.name || ''
+    
     console.log('Setting initialNodes:', nodes.length, 'initialEdges:', edges.length)
+    console.log('Composition name:', currentCompositionName.value)
     initialNodes.value = nodes
     initialEdges.value = edges
     currentCompositionId.value = compositionId
