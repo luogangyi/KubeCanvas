@@ -78,15 +78,46 @@ npm run docker:build
 # 或
 docker build -t kubecanvas:latest .
 
-# 运行容器
+# 运行容器 (简单方式，无 K8s 配置)
 npm run docker:run
 # 或
-docker run -p 8080:80 --rm kubecanvas:latest
+docker run -p 8080:80   -e KUBERNETES_API_SERVER="【修改为实际的API Server地址】"   -e KUBERNETES_TOKEN="【修改为实际的TOKEN】"   -e KUBERNETES_NAMESPACE="【修改为实际的Namespace】"   --rm   kubecanvas:latest
 
 # 访问 http://localhost:8080
 ```
 
-### 2.2 多架构构建 (amd64 + arm64)
+### 2.2 使用环境变量运行
+
+连接外部 K8s 集群时，需要通过环境变量传入配置：
+
+```bash
+# 直接指定配置
+docker run -p 8080:80 \
+  -e KUBERNETES_API_SERVER="https://your-k8s-api:6443" \
+  -e KUBERNETES_TOKEN="your-token-here" \
+  -e KUBERNETES_NAMESPACE="default" \
+  --rm \
+  kubecanvas:latest
+
+# 或从 .env.local 文件读取
+source .env.local
+docker run -p 8080:80 \
+  -e KUBERNETES_API_SERVER="$VITE_K8S_API_SERVER" \
+  -e KUBERNETES_TOKEN="$VITE_K8S_TOKEN" \
+  -e KUBERNETES_NAMESPACE="$VITE_K8S_NAMESPACE" \
+  --rm \
+  kubecanvas:latest
+```
+
+**环境变量说明：**
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `KUBERNETES_API_SERVER` | 是 | K8s API Server 地址 |
+| `KUBERNETES_TOKEN` | 是 | ServiceAccount Token |
+| `KUBERNETES_NAMESPACE` | 否 | 默认命名空间 (default: `default`) |
+
+### 2.3 多架构构建 (amd64 + arm64)
 
 适用于需要同时支持 x86 和 ARM 架构的场景（如 Apple Silicon + 云服务器）：
 

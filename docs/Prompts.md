@@ -539,3 +539,27 @@ UI 交互设计建议
 你是架构师，现在需要提升项目的可维护性和可交付性，请设计实现方案，至少包括增加控制台的日志输出、可配置的日志持久化、支持打包成docker等，并添加相关的配置和使用
 有两个修改1）Dockerfile要支持多CPU架构编译。2）添加一个部署指导的文档，包括本地开发、docker-compose及K8s等方式
 ```
+
+
+- 测试一下
+```
+我已经在本地load了镜像 kubecanvas:latest，我需要测试一下，请给出docker run的命令，并且通过环境变量传入token、apiserver地址和Namespace
+```
+
+- AI 给出的测试启动命令
+```bash
+# 读取现有配置
+source .env.local
+docker run -p 8080:80 \
+  -e KUBERNETES_API_SERVER="$VITE_K8S_API_SERVER" \
+  -e KUBERNETES_TOKEN="$VITE_K8S_TOKEN" \
+  -e KUBERNETES_NAMESPACE="$VITE_K8S_NAMESPACE" \
+  --rm \
+  kubecanvas:latest
+```
+
+- 测试报错了，让AI修改下
+```
+docker日志报2026/01/14 14:09:17 [error] 11#11: *3 access forbidden by rule, client: 192.168.215.1, server: _, request: "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1", host: "localhost:8080"
+```
+

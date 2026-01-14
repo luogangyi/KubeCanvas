@@ -137,10 +137,11 @@ async function initApiClient() {
 
     effectiveConfig = await getEffectiveConfig()
 
-    // 开发环境使用 Vite 代理来绕过 CORS
-    // 生产环境（in-cluster）直接使用 API Server 地址
-    const isDev = import.meta.env.DEV
-    const baseURL = isDev ? '/k8s-api' : effectiveConfig.apiServer
+    // 浏览器环境始终使用代理路径 /k8s-api
+    // 开发环境: Vite 代理
+    // 生产环境: Nginx 代理
+    // 两者都会将 /k8s-api 代理到实际的 K8s API Server
+    const baseURL = '/k8s-api'
 
     apiClient = axios.create({
         baseURL: baseURL,
