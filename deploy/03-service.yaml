@@ -1,0 +1,59 @@
+# ==================================
+# Service
+# ==================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubecanvas
+  namespace: default
+  labels:
+    app: kubecanvas
+    app.kubernetes.io/name: kubecanvas
+    app.kubernetes.io/component: service
+spec:
+  type: ClusterIP
+  selector:
+    app: kubecanvas
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+
+---
+# ==================================
+# Ingress (可选 - 根据需要启用)
+# ==================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubecanvas
+  namespace: default
+  labels:
+    app: kubecanvas
+  annotations:
+    # 如果使用 nginx-ingress
+    # kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    
+    # 如果使用 traefik
+    # traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  # 如果有 IngressClass
+  # ingressClassName: nginx
+  rules:
+    - host: kubecanvas.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kubecanvas
+                port:
+                  number: 80
+  # TLS 配置 (可选)
+  # tls:
+  #   - hosts:
+  #       - kubecanvas.local
+  #     secretName: kubecanvas-tls

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files (may contain secrets)
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+coverage/
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development files
+.DS_Store
+Thumbs.db
+
+# TypeScript build cache
+*.tsbuildinfo

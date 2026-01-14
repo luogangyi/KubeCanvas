@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  kubecanvas:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kubecanvas:latest
+    container_name: kubecanvas
+    ports:
+      - "8080:80"
+    environment:
+      - KUBERNETES_TOKEN=${VITE_K8S_TOKEN:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # 可选: 用于开发环境的日志收集
+  # loki:
+  #   image: grafana/loki:latest
+  #   ports:
+  #     - "3100:3100"
+  #   volumes:
+  #     - loki-data:/loki
+
+# volumes:
+#   loki-data:

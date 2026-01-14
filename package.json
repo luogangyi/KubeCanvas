@@ -28,7 +28,14 @@
     "test:coverage": "vitest run --coverage",
     "download-schemas": "npx tsx scripts/download-schemas.ts",
     "scan-immutables": "npx tsx scripts/scan-immutables.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docker:build": "docker build -t kubecanvas:latest .",
+    "docker:run": "docker run -p 8080:80 --rm kubecanvas:latest",
+    "docker:push": "docker push kubecanvas:latest",
+    "docker:compose": "docker-compose up --build",
+    "k8s:deploy": "kubectl apply -f deploy/",
+    "k8s:delete": "kubectl delete -f deploy/",
+    "k8s:logs": "kubectl logs -f -l app=kubecanvas"
   },
   "dependencies": {
     "@vue-flow/background": "^1.3.2",

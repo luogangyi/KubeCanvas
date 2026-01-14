@@ -1,0 +1,75 @@
+# ==================================
+# ServiceAccount
+# ==================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubecanvas
+  namespace: default
+  labels:
+    app: kubecanvas
+    app.kubernetes.io/name: kubecanvas
+    app.kubernetes.io/component: service-account
+
+---
+# ==================================
+# ClusterRole - K8s 资源操作权限
+# ==================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubecanvas
+  labels:
+    app: kubecanvas
+rules:
+  # Core API 资源
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+      - services
+      - configmaps
+      - secrets
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
+  # Apps API 资源
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - statefulsets
+      - daemonsets
+      - replicasets
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
+  # Batch API 资源
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
+  # Networking API 资源
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# ==================================
+# ClusterRoleBinding
+# ==================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubecanvas
+  labels:
+    app: kubecanvas
+subjects:
+  - kind: ServiceAccount
+    name: kubecanvas
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: kubecanvas
+  apiGroup: rbac.authorization.k8s.io
