@@ -5,11 +5,11 @@
     </div>
     
     <div class="sidebar__content">
-      <!-- 集群（放在最前面）-->
-      <div class="section-title">集群</div>
+      <!-- 命名空间（放在最前面）-->
+      <div class="section-title">命名空间</div>
       <div class="resource-list">
         <div
-          v-for="resource in clusterResources"
+          v-for="resource in namespaceResources"
           :key="resource.type"
           class="resource-card"
           :class="`resource-card--${resource.type}`"
@@ -218,8 +218,8 @@ const storageResources = computed(() =>
   resourceTypes.filter(r => r.category === 'storage')
 )
 
-const clusterResources = computed(() => 
-  resourceTypes.filter(r => r.category === 'cluster')
+const namespaceResources = computed(() => 
+  resourceTypes.filter(r => r.category === 'namespace')
 )
 
 // 拖拽开始
@@ -247,15 +247,15 @@ function onDragStart(event, resource) {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 5px 8px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   cursor: grab;
   transition: all var(--transition-fast);
   user-select: none;
-  height: 44px;
+  height: 32px;
 }
 
 .resource-card:hover {
@@ -271,8 +271,8 @@ function onDragStart(event, resource) {
 }
 
 .resource-card__icon {
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -286,7 +286,7 @@ function onDragStart(event, resource) {
 }
 
 .resource-card__name {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;

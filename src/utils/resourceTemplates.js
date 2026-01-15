@@ -537,7 +537,7 @@ export const resourceTypes = [
         description: '命名空间容器',
         icon: 'ns',
         color: '#6b7280',
-        category: 'cluster'
+        category: 'namespace'
     },
     {
         type: 'deployment',

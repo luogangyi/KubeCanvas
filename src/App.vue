@@ -36,6 +36,8 @@
       @nodesChange="onNodesChange"
       @edgesChange="onEdgesChange"
       @connect="onConnect"
+      @connectionError="onConnectionError"
+      @deleteNode="deleteSelectedNode"
     />
     
     <!-- 属性面板 -->
@@ -158,6 +160,11 @@ function onEdgesChange(edges) {
 // 连接事件
 function onConnect({ source, target }) {
   showToast(`已连接: ${source.data.name} → ${target.data.name}`)
+}
+
+// 连接错误事件 (K8s 语义校验失败)
+function onConnectionError(reason) {
+  showToast(reason, 'error')
 }
 
 // 属性更新

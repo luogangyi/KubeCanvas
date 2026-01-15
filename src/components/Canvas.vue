@@ -112,6 +112,7 @@ import BaseNode from './nodes/BaseNode.vue'
 import NamespaceNode from './nodes/NamespaceNode.vue'
 import { createResourceTemplate, getResourceTypeConfig } from '../utils/resourceTemplates.js'
 import { getDefaultNamespace } from '../composables/useK8sApi.js'
+import { validateConnection } from '../utils/connectionRules.js'
 
 const props = defineProps({
   compositionId: {
@@ -128,7 +129,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect'])
+const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect', 'connectionError', 'deleteNode'])
 
 const vueFlowRef = ref(null)
 const { project, findNode, getNodes, getEdges, removeSelectedNodes } = useVueFlow()
@@ -693,7 +694,19 @@ function onNodeDragStop(event) {
 // 创建连接 - 核心逻辑
 function createConnection(sourceNode, targetNode, explicitSourceHandle = null, explicitTargetHandle = null) {
   if (!sourceNode || !targetNode) return
-  if (sourceNode.id === targetNode.id) return
+  
+  // 自连接检查
+  if (sourceNode.id === targetNode.id) {
+    emit('connectionError', '不能连接到自己')
+    return
+  }
+  
+  // 验证连接合法性 (K8s 语义校验)
+  const validation = validateConnection(sourceNode.type, targetNode.type, sourceNode.id, targetNode.id)
+  if (!validation.valid) {
+    emit('connectionError', validation.reason)
+    return
+  }
   
   // 确定连接点
   // 优先级：显式传入 > 用户悬停选择 > 用户拖拽源 > 自动计算
@@ -1393,17 +1406,23 @@ defineExpose({
 
 /* 画布容器需要可聚焦以接收键盘事件 */
 .canvas-container {
+  flex: 1;
+  position: relative;
+  min-width: 0; /* 防止 flex 子元素溢出 */
+  height: calc(100vh - var(--header-height));
+  margin-top: var(--header-height);
+  overflow: hidden;
   outline: none;
 }
 
 /* 连线画笔工具 - 透明背景 */
 .connector-brush {
   position: absolute;
-  top: 80px;
-  left: 20px;
+  top: 12px;
+  left: 8px;
   z-index: 10;
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1417,9 +1436,9 @@ defineExpose({
 }
 
 .connector-brush svg {
-  width: 32px;
-  height: 32px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 .connector-brush:hover {
