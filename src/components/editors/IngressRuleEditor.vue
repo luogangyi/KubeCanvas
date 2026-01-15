@@ -179,27 +179,27 @@ function emitChange() {
 .ingress-rule-editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .rule-row {
-  padding: 12px;
-  background: var(--gray-50);
-  border-radius: 8px;
-  border: 1px solid var(--gray-200);
+  padding: var(--space-3);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
 }
 
 .rule-header {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .rule-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .host-field {
@@ -208,37 +208,37 @@ function emitChange() {
 
 .rule-label {
   font-size: 11px;
-  color: var(--gray-500);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .paths-section {
-  padding-top: 12px;
-  border-top: 1px solid var(--gray-200);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
 }
 
 .paths-header {
   font-size: 12px;
   font-weight: 600;
-  color: var(--gray-600);
-  margin-bottom: 8px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
 }
 
 .path-row {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 8px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid var(--gray-200);
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
 }
 
 .path-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   flex: 1;
   min-width: 60px;
 }
@@ -249,7 +249,7 @@ function emitChange() {
 
 .path-label {
   font-size: 10px;
-  color: var(--gray-500);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -264,58 +264,51 @@ function emitChange() {
   width: 28px;
   height: 28px;
   padding: 0;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  transition: all 0.2s;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
 }
 
-.btn-remove {
-  background: var(--gray-100);
-  color: var(--gray-500);
-}
-
-.btn-remove:hover {
-  background: #fee2e2;
-  color: #dc2626;
+.btn-remove:hover,
+.btn-remove-small:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .btn-remove-small {
   width: 24px;
   height: 24px;
   font-size: 10px;
-  background: var(--gray-100);
-  color: var(--gray-500);
   margin-bottom: 2px;
 }
 
-.btn-remove-small:hover {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
 .btn-add, .btn-add-small {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: 13px;
-  background: var(--gray-50);
-  border: 1px dashed var(--gray-300);
-  color: var(--gray-600);
-  border-radius: 6px;
+  background: transparent;
+  border: 1px dashed var(--border-default);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .btn-add-small {
-  padding: 6px 10px;
+  padding: var(--space-1) var(--space-2);
   font-size: 12px;
 }
 
 .btn-add:hover, .btn-add-small:hover {
-  background: var(--primary-50);
-  border-color: var(--primary-300);
-  color: var(--primary-600);
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  color: var(--accent-light);
 }
 </style>

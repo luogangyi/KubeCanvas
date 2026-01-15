@@ -3,7 +3,7 @@
     <!-- 头部 -->
     <header class="app-header">
       <div class="app-header__logo">
-        <div class="app-header__logo-icon">☸</div>
+        <img src="./assets/icons/kubecanvas-logo.png" alt="KubeCanvas" class="app-header__logo-icon" />
         <span>KubeCanvas</span>
       </div>
       

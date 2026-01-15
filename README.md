@@ -1,6 +1,8 @@
 <div align="center">
 
-# ☸️ KubeCanvas
+<img src="docs/images/logo.png" alt="KubeCanvas Logo" width="200"/>
+
+# KubeCanvas
 
 **Visual Kubernetes Resource Orchestration Tool**
 

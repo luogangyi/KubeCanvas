@@ -32,12 +32,7 @@ function getInitialTheme(): Theme {
         return envTheme
     }
 
-    // 3. 检查系统偏好
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-        return 'light'
-    }
-
-    // 4. 默认暗色
+    // 3. 默认暗色 (不再检测系统偏好，因为本应用深色优先)
     return 'dark'
 }
 

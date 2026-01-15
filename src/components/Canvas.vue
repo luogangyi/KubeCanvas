@@ -85,6 +85,20 @@
       <Background :gap="20" :size="1" />
       <Controls />
     </VueFlow>
+    
+    <!-- 右键上下文菜单 -->
+    <div 
+      v-if="contextMenu.visible" 
+      class="context-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+    >
+      <div v-if="contextMenu.type === 'node'" class="context-menu-item" @click="deleteContextNode">
+        🗑️ 删除 {{ contextMenu.node?.data?.name || '节点' }}
+      </div>
+      <div v-if="contextMenu.type === 'edge'" class="context-menu-item" @click="deleteContextEdge">
+        🗑️ 删除连线
+      </div>
+    </div>
   </div>
 </template>
 
@@ -128,6 +142,16 @@ const connectionCreated = ref(false) // 防止重复创建连线
 const sourceHandleId = ref(null) // 源连接点 ID
 const hoveredHandleId = ref(null) // 悬停的目标连接点 ID
 const showBrushTooltip = ref(false) // 画笔 tooltip 显示状态
+
+// 右键上下文菜单状态
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  type: null, // 'node' | 'edge'
+  node: null,
+  edge: null
+})
 
 // 源节点位置（用于绘制临时连线）
 const sourcePosition = computed(() => {
@@ -229,11 +253,88 @@ function onKeyDown(event) {
   }
 }
 
-// 右键取消
+// 右键菜单
 function onRightClick(event) {
+  // 如果正在连线，取消连线
   if (isConnecting.value) {
     cancelConnection()
+    return
   }
+  
+  // 隐藏之前的菜单
+  hideContextMenu()
+  
+  // 检查是否点击在节点上
+  const target = event.target
+  const nodeEl = target.closest('.vue-flow__node')
+  if (nodeEl) {
+    const nodeId = nodeEl.getAttribute('data-id')
+    const node = findNode(nodeId)
+    if (node && node.type !== 'namespace') { // 不为 Namespace 显示删除菜单
+      contextMenu.value = {
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        type: 'node',
+        node: node,
+        edge: null
+      }
+      return
+    }
+  }
+  
+  // 检查是否点击在边上
+  const edgeEl = target.closest('.vue-flow__edge')
+  if (edgeEl) {
+    const edgeId = edgeEl.getAttribute('data-id')
+    const edge = edges.value.find(e => e.id === edgeId)
+    if (edge) {
+      contextMenu.value = {
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        type: 'edge',
+        node: null,
+        edge: edge
+      }
+      return
+    }
+  }
+}
+
+// 隐藏上下文菜单
+function hideContextMenu() {
+  contextMenu.value = {
+    visible: false,
+    x: 0,
+    y: 0,
+    type: null,
+    node: null,
+    edge: null
+  }
+}
+
+// 删除上下文菜单中的节点
+function deleteContextNode() {
+  const node = contextMenu.value.node
+  if (node) {
+    emit('deleteNode', node)
+  }
+  hideContextMenu()
+}
+
+// 删除上下文菜单中的边
+function deleteContextEdge() {
+  const edge = contextMenu.value.edge
+  if (edge) {
+    // 触发边变化事件以清理关系
+    const removeChange = { type: 'remove', id: edge.id }
+    onEdgesChange([removeChange])
+    
+    // 从 edges 中移除
+    edges.value = edges.value.filter(e => e.id !== edge.id)
+  }
+  hideContextMenu()
 }
 
 // 全局键盘监听
@@ -647,15 +748,54 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
     }
   }
   
-  // 如果是 Ingress 连接到 Service
+  // 如果是 Ingress ↔ Service 连接 (支持双向)
+  let ingressNode = null
+  let serviceNode = null
+  
   if (sourceNode.type === 'ingress' && targetNode.type === 'service') {
-    const serviceName = targetNode.data.name
-    const servicePort = targetNode.data.resource.spec?.ports?.[0]?.port || 80
+    ingressNode = sourceNode
+    serviceNode = targetNode
+  } else if (sourceNode.type === 'service' && targetNode.type === 'ingress') {
+    ingressNode = targetNode
+    serviceNode = sourceNode
+  }
+  
+  if (ingressNode && serviceNode) {
+    const serviceName = serviceNode.data.name
+    const servicePort = serviceNode.data.resource.spec?.ports?.[0]?.port || 80
     
-    if (sourceNode.data.resource.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service) {
-      sourceNode.data.resource.spec.rules[0].http.paths[0].backend.service.name = serviceName
-      sourceNode.data.resource.spec.rules[0].http.paths[0].backend.service.port.number = servicePort
+    // 确保 spec.rules 结构存在
+    if (!ingressNode.data.resource.spec) {
+      ingressNode.data.resource.spec = {}
     }
+    if (!ingressNode.data.resource.spec.rules || ingressNode.data.resource.spec.rules.length === 0) {
+      ingressNode.data.resource.spec.rules = [{ http: { paths: [] } }]
+    }
+    const rule = ingressNode.data.resource.spec.rules[0]
+    if (!rule.http) {
+      rule.http = { paths: [] }
+    }
+    if (!rule.http.paths || rule.http.paths.length === 0) {
+      rule.http.paths = [{
+        path: '/',
+        pathType: 'Prefix',
+        backend: { service: { name: '', port: { number: 80 } } }
+      }]
+    }
+    const path = rule.http.paths[0]
+    if (!path.backend) {
+      path.backend = { service: { name: '', port: { number: 80 } } }
+    }
+    if (!path.backend.service) {
+      path.backend.service = { name: '', port: { number: 80 } }
+    }
+    if (!path.backend.service.port) {
+      path.backend.service.port = { number: 80 }
+    }
+    
+    // 设置 Service 名称和端口
+    path.backend.service.name = serviceName
+    path.backend.service.port.number = servicePort
   }
   
   // 处理存储/配置资源连接（支持双向：PVC/ConfigMap/Secret ↔ 工作负载）
@@ -792,8 +932,107 @@ function onNodesChange(changes) {
   emit('nodesChange', nodes.value)
 }
 
-// 边变化
+// 边变化 - 处理边删除时同步清理资源关系
 function onEdgesChange(changes) {
+  // 检查是否有边被删除
+  const removedEdges = changes.filter(change => change.type === 'remove')
+  
+  removedEdges.forEach(change => {
+    const edgeId = change.id
+    // 从当前 edges 中查找被删除的边
+    const edge = edges.value.find(e => e.id === edgeId)
+    if (!edge) return
+    
+    const sourceNode = findNode(edge.source)
+    const targetNode = findNode(edge.target)
+    if (!sourceNode || !targetNode) return
+    
+    // 清理 Ingress ↔ Service 关系
+    const ingressNode = [sourceNode, targetNode].find(n => n.type === 'ingress')
+    const serviceNode = [sourceNode, targetNode].find(n => n.type === 'service')
+    
+    if (ingressNode && serviceNode) {
+      // 清除 Ingress 中对该 Service 的引用
+      const rules = ingressNode.data.resource.spec?.rules || []
+      rules.forEach(rule => {
+        if (rule.http?.paths) {
+          rule.http.paths.forEach(path => {
+            if (path.backend?.service?.name === serviceNode.data.name) {
+              path.backend.service.name = ''
+            }
+          })
+        }
+      })
+    }
+    
+    // 清理 Service → Workload 关系
+    if (sourceNode.type === 'service' || targetNode.type === 'service') {
+      const svcNode = sourceNode.type === 'service' ? sourceNode : targetNode
+      const workloadNode = sourceNode.type === 'service' ? targetNode : sourceNode
+      const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+      
+      if (workloadTypes.includes(workloadNode.type)) {
+        // 清除 Service 的 selector
+        if (svcNode.data.resource.spec?.selector) {
+          svcNode.data.resource.spec.selector = {}
+        }
+      }
+    }
+    
+    // 清理存储/配置资源关系 (PVC/ConfigMap/Secret ↔ Workload)
+    const storageTypes = ['pvc', 'configmap', 'secret']
+    const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+    
+    const storageNode = [sourceNode, targetNode].find(n => storageTypes.includes(n.type))
+    const workloadNode = [sourceNode, targetNode].find(n => workloadTypes.includes(n.type))
+    
+    if (storageNode && workloadNode) {
+      const resource = workloadNode.data.resource
+      const getPodSpec = (res) => {
+        if (res.kind === 'Pod') return res.spec
+        if (['Deployment', 'StatefulSet', 'Job'].includes(res.kind)) {
+          return res.spec?.template?.spec
+        }
+        if (res.kind === 'CronJob') {
+          return res.spec?.jobTemplate?.spec?.template?.spec
+        }
+        return null
+      }
+      
+      const podSpec = getPodSpec(resource)
+      if (podSpec) {
+        const storageName = storageNode.data.name
+        
+        if (storageNode.type === 'pvc') {
+          // 移除 volume 和 volumeMount
+          const volumeName = `vol-${storageName}`
+          if (podSpec.volumes) {
+            podSpec.volumes = podSpec.volumes.filter(v => v.name !== volumeName)
+          }
+          if (podSpec.containers?.[0]?.volumeMounts) {
+            podSpec.containers[0].volumeMounts = podSpec.containers[0].volumeMounts.filter(
+              vm => vm.name !== volumeName
+            )
+          }
+        } else if (storageNode.type === 'configmap') {
+          // 移除 ConfigMap envFrom
+          if (podSpec.containers?.[0]?.envFrom) {
+            podSpec.containers[0].envFrom = podSpec.containers[0].envFrom.filter(
+              ef => ef.configMapRef?.name !== storageName
+            )
+          }
+        } else if (storageNode.type === 'secret') {
+          // 移除 Secret envFrom
+          if (podSpec.containers?.[0]?.envFrom) {
+            podSpec.containers[0].envFrom = podSpec.containers[0].envFrom.filter(
+              ef => ef.secretRef?.name !== storageName
+            )
+          }
+        }
+      }
+    }
+  })
+  
   emit('edgesChange', edges.value)
 }
 
@@ -835,6 +1074,9 @@ function onNodeDoubleClick({ node }) {
 
 // 画布点击
 function onPaneClick() {
+  // 隐藏上下文菜单
+  hideContextMenu()
+  
   if (isConnecting.value) {
     // 画布空白处点击：如果有源节点则取消选择源节点，否则退出画笔模式
     if (connectionSource.value) {
@@ -1320,5 +1562,31 @@ defineExpose({
 /* 节点悬停时的高亮效果 */
 .vue-flow__node:hover {
   z-index: 10;
+}
+
+/* 右键上下文菜单 */
+.context-menu {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-1);
+  z-index: 1000;
+  min-width: 150px;
+}
+
+.context-menu-item {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-tertiary);
 }
 </style>
