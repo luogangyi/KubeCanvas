@@ -171,6 +171,7 @@ const sourcePosition = computed(() => {
 // 节点类型映射
 const nodeTypes = {
   deployment: markRaw(BaseNode),
+  daemonset: markRaw(BaseNode),
   statefulset: markRaw(BaseNode),
   service: markRaw(BaseNode),
   pod: markRaw(BaseNode),
@@ -714,7 +715,7 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
   if (existingEdge) return
   
   // 工作负载类型列表
-  const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+  const workloadTypes = ['deployment', 'daemonset', 'statefulset', 'pod', 'job', 'cronjob']
   
   // 获取工作负载的 Pod Spec
   const getPodSpec = (resource) => {
@@ -969,7 +970,7 @@ function onEdgesChange(changes) {
     if (sourceNode.type === 'service' || targetNode.type === 'service') {
       const svcNode = sourceNode.type === 'service' ? sourceNode : targetNode
       const workloadNode = sourceNode.type === 'service' ? targetNode : sourceNode
-      const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+      const workloadTypes = ['deployment', 'daemonset', 'statefulset', 'pod', 'job', 'cronjob']
       
       if (workloadTypes.includes(workloadNode.type)) {
         // 清除 Service 的 selector
@@ -981,7 +982,7 @@ function onEdgesChange(changes) {
     
     // 清理存储/配置资源关系 (PVC/ConfigMap/Secret ↔ Workload)
     const storageTypes = ['pvc', 'configmap', 'secret']
-    const workloadTypes = ['deployment', 'statefulset', 'pod', 'job', 'cronjob']
+    const workloadTypes = ['deployment', 'daemonset', 'statefulset', 'pod', 'job', 'cronjob']
     
     const storageNode = [sourceNode, targetNode].find(n => storageTypes.includes(n.type))
     const workloadNode = [sourceNode, targetNode].find(n => workloadTypes.includes(n.type))

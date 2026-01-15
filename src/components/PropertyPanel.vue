@@ -133,6 +133,75 @@
         </CollapsibleSection>
       </template>
       
+      <!-- DaemonSet 特有属性 -->
+      <template v-if="nodeType === 'daemonset'">
+        <CollapsibleSection title="🔄 DaemonSet 配置" :defaultExpanded="true">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">更新策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.strategyType"
+                @change="emitUpdate('strategyType', localData.strategyType)"
+              >
+                <option value="RollingUpdate">RollingUpdate</option>
+                <option value="OnDelete">OnDelete</option>
+              </select>
+            </div>
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="📦 Pod 配置">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">重启策略</label>
+              <select 
+                class="form-select" 
+                v-model="localData.restartPolicy"
+                @change="emitUpdate('restartPolicy', localData.restartPolicy)"
+              >
+                <option value="Always">Always</option>
+                <option value="OnFailure">OnFailure</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+                placeholder="default"
+              />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Node Selector</label>
+            <KeyValueEditor 
+              v-model="localData.nodeSelector" 
+              @update:modelValue="v => emitUpdate('nodeSelector', v)" 
+            />
+          </div>
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="💾 Volumes">
+          <VolumeEditor 
+            v-model="localData.volumes" 
+            @update:modelValue="v => emitUpdate('volumes', v)" 
+          />
+        </CollapsibleSection>
+        
+        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+          <ContainerEditor 
+            v-model="localData.containers" 
+            :volumes="localData.volumes"
+            @update:modelValue="v => emitUpdate('containers', v)" 
+          />
+        </CollapsibleSection>
+      </template>
+      
       <!-- StatefulSet 特有属性 -->
       <template v-if="nodeType === 'statefulset'">
         <CollapsibleSection title="📦 StatefulSet 配置" :defaultExpanded="true">
@@ -617,6 +686,7 @@ const resourceKind = computed(() => {
   const type = nodeType.value
   const kindMap = {
     deployment: 'Deployment',
+    daemonset: 'DaemonSet',
     statefulset: 'StatefulSet',
     service: 'Service',
     ingress: 'Ingress',

@@ -100,6 +100,9 @@ const displayProperties = computed(() => {
       properties['副本数'] = resource?.spec?.replicas || 1
       properties['镜像'] = resource?.spec?.template?.spec?.containers?.[0]?.image || 'N/A'
       break
+    case 'daemonset':
+      properties['镜像'] = resource?.spec?.template?.spec?.containers?.[0]?.image || 'N/A'
+      break
     case 'service':
       properties['类型'] = resource?.spec?.type || 'ClusterIP'
       properties['端口'] = resource?.spec?.ports?.[0]?.port || 'N/A'

@@ -177,6 +177,7 @@ function getApiPath(kind, namespace) {
         Namespace: `/api/v1/namespaces`,
         // 命名空间级资源
         Deployment: `/apis/apps/v1/namespaces/${namespace}/deployments`,
+        DaemonSet: `/apis/apps/v1/namespaces/${namespace}/daemonsets`,
         StatefulSet: `/apis/apps/v1/namespaces/${namespace}/statefulsets`,
         Service: `/api/v1/namespaces/${namespace}/services`,
         Pod: `/api/v1/namespaces/${namespace}/pods`,

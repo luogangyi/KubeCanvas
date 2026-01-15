@@ -69,6 +69,58 @@ export function createDeploymentTemplate(name, options = {}) {
     }
 }
 
+// DaemonSet 模板
+export function createDaemonSetTemplate(name, options = {}) {
+    const {
+        image = 'nginx:latest',
+        containerPort = 80,
+        labels = {},
+        namespace = 'default'
+    } = options
+
+    const appLabels = {
+        app: name,
+        ...labels
+    }
+
+    return {
+        apiVersion: 'apps/v1',
+        kind: 'DaemonSet',
+        metadata: {
+            name,
+            namespace,
+            labels: appLabels
+        },
+        spec: {
+            selector: {
+                matchLabels: {
+                    app: name
+                }
+            },
+            template: {
+                metadata: {
+                    labels: {
+                        app: name
+                    }
+                },
+                spec: {
+                    containers: [
+                        {
+                            name: name,
+                            image,
+                            ports: [
+                                {
+                                    containerPort
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
+
 // StatefulSet 模板
 export function createStatefulSetTemplate(name, options = {}) {
     const {
@@ -456,6 +508,7 @@ export function createNamespaceTemplate(name, options = {}) {
 export function createResourceTemplate(type, name, options = {}) {
     const templateCreators = {
         deployment: createDeploymentTemplate,
+        daemonset: createDaemonSetTemplate,
         statefulset: createStatefulSetTemplate,
         service: createServiceTemplate,
         pod: createPodTemplate,
@@ -492,6 +545,14 @@ export const resourceTypes = [
         description: '无状态应用部署',
         icon: 'deploy',
         color: '#3b82f6',
+        category: 'workloads'
+    },
+    {
+        type: 'daemonset',
+        name: 'DaemonSet',
+        description: '每节点运行一个Pod',
+        icon: 'deploy',
+        color: '#7c3aed',
         category: 'workloads'
     },
     {
