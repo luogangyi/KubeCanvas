@@ -183,11 +183,11 @@ function closePanel() {
   selectedNode.value = null
 }
 
-// 删除选中节点
-async function deleteSelectedNode() {
-  if (!selectedNode.value || !canvasRef.value) return
+// 删除选中节点（支持从右键菜单传入节点或使用当前选中节点）
+async function deleteSelectedNode(nodeFromContextMenu = null) {
+  const nodeToDelete = nodeFromContextMenu || selectedNode.value
+  if (!nodeToDelete || !canvasRef.value) return
   
-  const nodeToDelete = selectedNode.value
   const resource = nodeToDelete.data?.resource
   
   // 检查引用关系

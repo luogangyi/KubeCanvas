@@ -272,7 +272,7 @@ function onRightClick(event) {
   if (nodeEl) {
     const nodeId = nodeEl.getAttribute('data-id')
     const node = findNode(nodeId)
-    if (node && node.type !== 'namespace') { // 不为 Namespace 显示删除菜单
+    if (node) {
       contextMenu.value = {
         visible: true,
         x: event.clientX,

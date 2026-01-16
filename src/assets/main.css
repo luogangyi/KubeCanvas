@@ -354,6 +354,21 @@ body {
   filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
+/* 确保边可以被点击选中 */
+.vue-flow__edges {
+  z-index: 5 !important;
+  pointer-events: auto !important;
+}
+
+.vue-flow__edge {
+  pointer-events: stroke !important;
+  cursor: pointer !important;
+}
+
+.vue-flow__edge-path {
+  pointer-events: stroke !important;
+}
+
 .vue-flow__edge.selected .vue-flow__edge-path,
 .vue-flow__edge.animated .vue-flow__edge-path {
   stroke: var(--accent-light) !important;

@@ -130,6 +130,7 @@ function stopResize() {
   min-width: 200px;
   min-height: 150px;
   transition: border-color 0.2s, box-shadow 0.2s;
+  pointer-events: none; /* 允许边和内部节点点击穿透 */
 }
 
 .namespace-node:hover {
@@ -152,6 +153,7 @@ function stopResize() {
   border-bottom: 1px solid rgba(107, 114, 128, 0.3);
   position: relative;
   cursor: pointer;
+  pointer-events: auto; /* 允许标题栏可点击 */
 }
 
 /* 自定义 Tooltip */
@@ -236,6 +238,7 @@ function stopResize() {
   border-radius: 3px;
   cursor: nwse-resize;
   z-index: 10;
+  pointer-events: auto; /* 允许拖拽手柄可点击 */
 }
 
 .resize-handle:hover {
@@ -273,6 +276,7 @@ function stopResize() {
   height: 14px;
   background: #6b7280;
   border: 2px solid var(--bg-secondary);
+  pointer-events: auto; /* 允许连接点可点击 */
 }
 
 :deep(.vue-flow__handle:hover) {
