@@ -81,9 +81,29 @@ npm run dev
 
 The application will be available at `http://localhost:5173`
 
+### Deploy to Kubernetes Cluster
+
+For quick deployment to an existing Kubernetes cluster:
+
+```bash
+# Clone the repository
+git clone https://github.com/luogangyi/KubeCanvas.git
+cd KubeCanvas
+
+# Deploy RBAC, Deployment, and NodePort Service
+kubectl apply -f deploy/01-rbac.yaml
+kubectl apply -f deploy/02-deployment.yaml
+kubectl apply -f deploy/03-service-nodeport.yaml
+
+# Access the application
+# http://<kubernetes-node-ip>:30073
+```
+
+> **Note**: Replace `<kubernetes-node-ip>` with your Kubernetes node IP (can be the API Server IP).
+
 ### Configuration
 
-To connect to your Kubernetes cluster, update the configuration in `src/config/k8s.js`:
+To connect to your Kubernetes cluster, create `.env.local` file:
 
 ```javascript
 export default {

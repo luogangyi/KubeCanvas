@@ -1,0 +1,22 @@
+# ==================================
+# Service Nodeport
+# ==================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubecanvas
+  namespace: default
+  labels:
+    app: kubecanvas
+    app.kubernetes.io/name: kubecanvas
+    app.kubernetes.io/component: service
+spec:
+  type: NodePort
+  selector:
+    app: kubecanvas
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+      nodePort: 30073

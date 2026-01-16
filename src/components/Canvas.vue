@@ -7,6 +7,7 @@
     @dragenter.prevent
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
+    @click="hideContextMenu"
     @contextmenu.prevent="onRightClick"
     @keydown="onKeyDown"
     tabindex="0"
@@ -271,7 +272,9 @@ function onRightClick(event) {
   const nodeEl = target.closest('.vue-flow__node')
   if (nodeEl) {
     const nodeId = nodeEl.getAttribute('data-id')
+    console.log('[ContextMenu] Right-click on node element, data-id:', nodeId)
     const node = findNode(nodeId)
+    console.log('[ContextMenu] findNode result:', node ? `Found: ${node.type}/${node.data?.name}` : 'NOT FOUND')
     if (node) {
       contextMenu.value = {
         visible: true,
@@ -316,6 +319,17 @@ function hideContextMenu() {
   }
 }
 
+// 全局鼠标按下事件处理 - 点击任何地方时隐藏上下文菜单
+function onDocumentMouseDown(event) {
+  console.log('[ContextMenu] mousedown event, button:', event.button, 'visible:', contextMenu.value.visible)
+  // 右键不处理（让 onRightClick 处理）
+  if (event.button === 2) return
+  // 如果点击的是上下文菜单本身，不隐藏
+  if (event.target.closest('.context-menu')) return
+  console.log('[ContextMenu] hiding menu')
+  hideContextMenu()
+}
+
 // 删除上下文菜单中的节点
 function deleteContextNode() {
   const node = contextMenu.value.node
@@ -348,10 +362,14 @@ function handleGlobalKeyDown(event) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleGlobalKeyDown)
+  // 添加全局鼠标按下监听 - 用于隐藏上下文菜单
+  document.addEventListener('mousedown', onDocumentMouseDown)
+  console.log('[Canvas] Event listeners registered')
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleGlobalKeyDown)
+  document.removeEventListener('mousedown', onDocumentMouseDown)
 })
 
 // 激活/关闭连线画笔模式
@@ -1109,6 +1127,9 @@ function onEdgesChange(changes) {
 
 // 节点点击
 function onNodeClick({ node }) {
+  // 先隐藏上下文菜单
+  hideContextMenu()
+  
   // 画笔连线模式
   if (isConnecting.value) {
     if (!connectionSource.value) {

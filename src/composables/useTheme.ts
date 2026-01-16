@@ -2,7 +2,7 @@
  * KubeCanvas Theme System
  * 
  * 支持暗色和亮色主题切换
- * 配置来源优先级: localStorage > 环境变量 > 默认值(dark)
+ * 配置来源优先级: localStorage > 环境变量 > 默认值(light)
  */
 
 import { ref, computed, watch } from 'vue'
@@ -32,8 +32,8 @@ function getInitialTheme(): Theme {
         return envTheme
     }
 
-    // 3. 默认暗色 (不再检测系统偏好，因为本应用深色优先)
-    return 'dark'
+    // 3. 默认亮色主题
+    return 'light'
 }
 
 /**

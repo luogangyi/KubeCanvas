@@ -130,7 +130,8 @@ function stopResize() {
   min-width: 200px;
   min-height: 150px;
   transition: border-color 0.2s, box-shadow 0.2s;
-  pointer-events: none; /* 允许边和内部节点点击穿透 */
+  /* 允许整个节点响应鼠标事件（选中、右键等） */
+  pointer-events: auto;
 }
 
 .namespace-node:hover {

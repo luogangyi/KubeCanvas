@@ -215,14 +215,100 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
       )
       if (!confirmed) return
       
-      // 删除所有内部组件
-      for (const childNode of childNodes) {
-        canvasRef.value.deleteNode(childNode.id)
+      // 如果是已保存的组合，从 K8s 删除子资源
+      if (currentCompositionName.value) {
+        try {
+          loading.value = true
+          loadingMessage.value = '删除 Namespace 及内部资源中...'
+          loadingProgress.value = 10
+          loadingSuccess.value = false
+          
+          // 先删除子资源
+          for (let i = 0; i < childNodes.length; i++) {
+            const childNode = childNodes[i]
+            const childResource = childNode.data?.resource
+            if (childResource?.metadata?.resourceVersion) {
+              try {
+                await deleteResource(childResource.kind, childResource.metadata.name, childResource.metadata.namespace)
+                console.log(`Deleted child resource: ${childResource.kind}/${childResource.metadata.name}`)
+              } catch (error) {
+                // 404 表示资源已不存在，继续删除其他资源
+                if (error.response?.status !== 404) {
+                  console.error(`Failed to delete ${childResource.kind}/${childResource.metadata.name}:`, error)
+                }
+              }
+            }
+            canvasRef.value.deleteNode(childNode.id)
+            loadingProgress.value = 10 + (i + 1) * 60 / childNodes.length
+          }
+          
+          // 再删除 Namespace
+          const nsResource = nsNode.data?.resource
+          if (nsResource?.metadata?.resourceVersion) {
+            try {
+              await deleteResource(nsResource.kind, nsResource.metadata.name)
+              console.log(`Deleted namespace: ${nsResource.metadata.name}`)
+            } catch (error) {
+              if (error.response?.status !== 404) {
+                console.error(`Failed to delete Namespace/${nsResource.metadata.name}:`, error)
+              }
+            }
+          }
+          
+          loadingProgress.value = 100
+          loadingSuccess.value = true
+          successMessage.value = `已删除 Namespace 及其 ${childNodes.length} 个内部组件`
+          
+          setTimeout(() => {
+            loading.value = false
+          }, 1000)
+          
+        } catch (error) {
+          loading.value = false
+          showToast(`删除失败: ${error.message}`, 'error')
+          console.error('Namespace delete error:', error)
+          return
+        }
+      } else {
+        // 未保存的组合，只从画布删除
+        for (const childNode of childNodes) {
+          canvasRef.value.deleteNode(childNode.id)
+        }
+        showToast(`已删除 Namespace 及其 ${childNodes.length} 个内部组件`)
       }
-      showToast(`已删除 Namespace 及其 ${childNodes.length} 个内部组件`)
+    } else {
+      // 没有子资源，只删除 Namespace
+      if (currentCompositionName.value) {
+        const nsResource = nsNode.data?.resource
+        if (nsResource?.metadata?.resourceVersion) {
+          try {
+            loading.value = true
+            loadingMessage.value = '删除 Namespace 中...'
+            loadingProgress.value = 50
+            loadingSuccess.value = false
+            
+            await deleteResource(nsResource.kind, nsResource.metadata.name)
+            
+            loadingProgress.value = 100
+            loadingSuccess.value = true
+            successMessage.value = `已删除 Namespace ${nsResource.metadata.name}`
+            
+            setTimeout(() => {
+              loading.value = false
+            }, 1000)
+          } catch (error) {
+            loading.value = false
+            if (error.response?.status !== 404) {
+              showToast(`删除失败: ${error.message}`, 'error')
+              console.error('Namespace delete error:', error)
+              return
+            }
+          }
+        }
+      }
     }
     
-    // 删除 Namespace 自身
+    // 删除 Namespace 自身（从画布）
     canvasRef.value.deleteNode(nodeToDelete.id)
     selectedNode.value = null
     return

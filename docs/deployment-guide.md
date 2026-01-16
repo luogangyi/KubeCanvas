@@ -230,29 +230,51 @@ kubectl port-forward svc/kubecanvas 8080:80
 
 **方式 2: NodePort**
 
-修改 `deploy/03-service.yaml` 中 Service 类型：
+使用预置的 NodePort 配置文件：
 
-```yaml
-spec:
-  type: NodePort
-  ports:
-    - port: 80
-      nodePort: 30080
+```bash
+# 使用 NodePort Service (端口 30073)
+kubectl apply -f deploy/03-service-nodeport.yaml
+
+# 访问 http://<节点IP>:30073
 ```
+
+如需修改端口，编辑 `deploy/03-service-nodeport.yaml` 中的 `nodePort` 字段。
 
 **方式 3: Ingress**
 
 修改 `deploy/03-service.yaml` 中 Ingress 配置，设置正确的域名和 IngressClass。
 
-### 4.4 查看日志
+### 4.4 使用 ConfigMap 自定义配置
+
+KubeCanvas 支持通过 ConfigMap 覆盖默认配置：
+
+```bash
+# 创建 ConfigMap
+kubectl apply -f deploy/04-configmap.yaml
+
+# 或手动创建
+kubectl create configmap kubecanvas-config \
+  --from-literal=UI_THEME=dark \
+  --from-literal=KUBERNETES_NAMESPACE=my-namespace
+```
+
+可配置项：
+- `UI_THEME`: 界面主题 (`light` 或 `dark`，默认 `light`)
+- `KUBERNETES_NAMESPACE`: 默认命名空间
+
+### 4.5 查看日志
 
 ```bash
 npm run k8s:logs
 # 或
 kubectl logs -f -l app=kubecanvas
+
+# 查看 K8s API 代理日志
+kubectl exec -it <pod-name> -- tail -f /var/log/nginx/k8s-api.log
 ```
 
-### 4.5 删除部署
+### 4.6 删除部署
 
 ```bash
 npm run k8s:delete

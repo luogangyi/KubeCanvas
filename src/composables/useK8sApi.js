@@ -110,7 +110,13 @@ async function getEffectiveConfig() {
                 skipTLSVerify: k8sConfig.skipTLSVerify
             }
         }
-        console.warn('In-cluster mode failed, falling back to custom config')
+        // 在浏览器环境中，无法读取 ServiceAccount 文件是正常的
+        // 因为 Nginx 代理会注入 Token，所以这不是真正的错误
+        // 只有在 Node.js 环境（SSR）中才需要警告
+        if (typeof process !== 'undefined' && process.env?.KUBERNETES_SERVICE_HOST) {
+            console.warn('In-cluster mode failed, falling back to custom config')
+        }
+        // 浏览器环境下使用空 token，依赖 Nginx 代理注入
     }
 
     // Custom 模式或回退

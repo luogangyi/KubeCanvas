@@ -79,6 +79,9 @@ server {
 
     # K8s API 代理
     location /k8s-api/ {
+        # 启用 K8s API 请求日志
+        access_log /var/log/nginx/k8s-api.log;
+        
         proxy_pass https://${K8S_HOST}/;
         proxy_ssl_verify off;
         proxy_ssl_server_name on;

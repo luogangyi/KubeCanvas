@@ -767,3 +767,14 @@ metadata.name: 命名空间名称绝对不可改。
 ```
 是的！第二个 toast "部分失败：0 成功，1 失败" 覆盖了第一个 "不可修改" 的提示。让我修复这个问题：
 ```
+
+
+
+```
+几个问题需要修复
+1）用docker 镜像在K8s中启动的时候，控制台报index-De-wTvJU.js:31  In-cluster mode failed, falling back to custom config ，但实际是In-cluster mode
+2）UI_THEME 默认改成light，用docker启动的时候，也要给出可以修改UI_THEME的方法，并补充到部署文档中（建议把env.local的配置写到一个配置文件中，然后允许通过configmap来挂载这个配置）
+3）通过已保存的组合恢复后，如果删除namespace，虽然前端提示删除成功，但实际上namespace没有在K8s中删除，Namespace中的资源也没有在K8s中删除
+4）部署文档中，增加nodeport启动方式的介绍，我已经补充配置文件到deploy/03-service-nodeport.yaml中了
+5）用docker 镜像启动后，看不到和后端K8s集群交互的日志
+```

@@ -81,9 +81,29 @@ npm run dev
 
 应用将在 `http://localhost:5173` 上运行
 
+### 部署到 Kubernetes 集群
+
+快速部署到现有的 Kubernetes 集群：
+
+```bash
+# 克隆仓库
+git clone https://github.com/luogangyi/KubeCanvas.git
+cd KubeCanvas
+
+# 部署 RBAC、Deployment 和 NodePort Service
+kubectl apply -f deploy/01-rbac.yaml
+kubectl apply -f deploy/02-deployment.yaml
+kubectl apply -f deploy/03-service-nodeport.yaml
+
+# 访问应用
+# http://<Kubernetes节点IP>:30073
+```
+
+> **提示**：将 `<Kubernetes节点IP>` 替换为 Kubernetes 节点 IP（可以使用 API Server 的 IP 地址）。
+
 ### 配置
 
-要连接到您的 Kubernetes 集群，请更新 `src/config/k8s.js` 中的配置：
+要连接到您的 Kubernetes 集群，请创建 `.env.local` 文件：
 
 ```javascript
 export default {
