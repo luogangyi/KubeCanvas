@@ -47,7 +47,7 @@
 ## 🖥️ 界面截图
 
 <div align="center">
-<img src="docs/images/screenshot.png" alt="KubeCanvas 截图" width="800"/>
+<img src="docs/images/screenshot-new.png" alt="KubeCanvas 截图" width="800"/>
 </div>
 
 ## 🛠️ 技术栈

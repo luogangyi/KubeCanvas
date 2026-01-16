@@ -47,7 +47,7 @@
 ## 🖥️ Screenshots
 
 <div align="center">
-<img src="docs/images/screenshot.png" alt="KubeCanvas Screenshot" width="800"/>
+<img src="docs/images/screenshot-new.png" alt="KubeCanvas Screenshot" width="800"/>
 </div>
 
 ## 🛠️ Tech Stack
