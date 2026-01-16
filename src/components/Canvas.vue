@@ -132,7 +132,7 @@ const props = defineProps({
 const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect', 'connectionError', 'deleteNode'])
 
 const vueFlowRef = ref(null)
-const { project, findNode, getNodes, getEdges, removeSelectedNodes } = useVueFlow()
+const { project, findNode, getNodes, getEdges, removeSelectedNodes, fitView } = useVueFlow()
 
 // 连线状态
 const isConnecting = ref(false)
@@ -556,6 +556,16 @@ function onDrop(event) {
   if (!resourceData) return
 
   const resource = JSON.parse(resourceData)
+  
+  // 检查 Namespace 单一限制：画布上最多只能有一个 Namespace
+  if (resource.type === 'namespace') {
+    const existingNamespace = nodes.value.find(n => n.type === 'namespace')
+    if (existingNamespace) {
+      emit('connectionError', '画布上只能创建一个 Namespace 容器')
+      return
+    }
+  }
+  
   const { x, y } = project({ x: event.clientX - 280, y: event.clientY - 64 })
   
   const nodeId = uuidv4()
@@ -748,15 +758,26 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
     return null
   }
   
-  // 如果是 Service 连接到 Deployment/StatefulSet/Pod
-  if (sourceNode.type === 'service' && 
-      ['deployment', 'statefulset', 'pod'].includes(targetNode.type)) {
-    const targetAppLabel = targetNode.data.resource.metadata?.labels?.app ||
-                          targetNode.data.resource.spec?.selector?.matchLabels?.app ||
-                          targetNode.data.name
+  // 如果是 Service ↔ Deployment/StatefulSet/DaemonSet/Pod 连接 (支持双向)
+  const serviceWorkloadTypes = ['deployment', 'statefulset', 'daemonset', 'pod']
+  let serviceNodeConn = null
+  let workloadNodeConn = null
+  
+  if (sourceNode.type === 'service' && serviceWorkloadTypes.includes(targetNode.type)) {
+    serviceNodeConn = sourceNode
+    workloadNodeConn = targetNode
+  } else if (serviceWorkloadTypes.includes(sourceNode.type) && targetNode.type === 'service') {
+    serviceNodeConn = targetNode
+    workloadNodeConn = sourceNode
+  }
+  
+  if (serviceNodeConn && workloadNodeConn) {
+    const targetAppLabel = workloadNodeConn.data.resource.metadata?.labels?.app ||
+                          workloadNodeConn.data.resource.spec?.selector?.matchLabels?.app ||
+                          workloadNodeConn.data.name
     
-    if (sourceNode.data.resource.spec) {
-      sourceNode.data.resource.spec.selector = {
+    if (serviceNodeConn.data.resource.spec) {
+      serviceNodeConn.data.resource.spec.selector = {
         app: targetAppLabel
       }
     }
@@ -957,8 +978,9 @@ function onEdgesChange(changes) {
     const edge = edges.value.find(e => e.id === edgeId)
     if (!edge) return
     
-    const sourceNode = findNode(edge.source)
-    const targetNode = findNode(edge.target)
+    // 使用 nodes.value.find 而不是 findNode，确保修改反映到 getAllResources
+    const sourceNode = nodes.value.find(n => n.id === edge.source)
+    const targetNode = nodes.value.find(n => n.id === edge.target)
     if (!sourceNode || !targetNode) return
     
     // 清理 Ingress ↔ Service 关系
@@ -1002,9 +1024,17 @@ function onEdgesChange(changes) {
     
     if (storageNode && workloadNode) {
       const resource = workloadNode.data.resource
+      console.log('[EdgeCleanup] Found storage-workload connection:', {
+        storageType: storageNode.type,
+        storageName: storageNode.data.name,
+        workloadType: workloadNode.type,
+        workloadName: workloadNode.data.name,
+        resourceKind: resource.kind
+      })
+      
       const getPodSpec = (res) => {
         if (res.kind === 'Pod') return res.spec
-        if (['Deployment', 'StatefulSet', 'Job'].includes(res.kind)) {
+        if (['Deployment', 'StatefulSet', 'DaemonSet', 'Job'].includes(res.kind)) {
           return res.spec?.template?.spec
         }
         if (res.kind === 'CronJob') {
@@ -1014,6 +1044,8 @@ function onEdgesChange(changes) {
       }
       
       const podSpec = getPodSpec(resource)
+      console.log('[EdgeCleanup] podSpec:', podSpec ? 'found' : 'null', 'volumes:', podSpec?.volumes?.length || 0)
+      
       if (podSpec) {
         const storageName = storageNode.data.name
         
@@ -1029,14 +1061,39 @@ function onEdgesChange(changes) {
             )
           }
         } else if (storageNode.type === 'configmap') {
-          // 移除 ConfigMap envFrom
+          // 移除 ConfigMap volume 和 volumeMount
+          const volumeName = `cm-${storageName}`
+          console.log('[EdgeCleanup] Removing ConfigMap volume:', volumeName, 'current volumes:', podSpec.volumes?.map(v => v.name))
+          
+          const volCountBefore = podSpec.volumes?.length || 0
+          if (podSpec.volumes) {
+            podSpec.volumes = podSpec.volumes.filter(v => v.name !== volumeName)
+          }
+          console.log('[EdgeCleanup] After removal:', volCountBefore, '=>', podSpec.volumes?.length || 0)
+          
+          if (podSpec.containers?.[0]?.volumeMounts) {
+            podSpec.containers[0].volumeMounts = podSpec.containers[0].volumeMounts.filter(
+              vm => vm.name !== volumeName
+            )
+          }
+          // 也移除 envFrom
           if (podSpec.containers?.[0]?.envFrom) {
             podSpec.containers[0].envFrom = podSpec.containers[0].envFrom.filter(
               ef => ef.configMapRef?.name !== storageName
             )
           }
         } else if (storageNode.type === 'secret') {
-          // 移除 Secret envFrom
+          // 移除 Secret volume 和 volumeMount
+          const volumeName = `secret-${storageName}`
+          if (podSpec.volumes) {
+            podSpec.volumes = podSpec.volumes.filter(v => v.name !== volumeName)
+          }
+          if (podSpec.containers?.[0]?.volumeMounts) {
+            podSpec.containers[0].volumeMounts = podSpec.containers[0].volumeMounts.filter(
+              vm => vm.name !== volumeName
+            )
+          }
+          // 也移除 envFrom
           if (podSpec.containers?.[0]?.envFrom) {
             podSpec.containers[0].envFrom = podSpec.containers[0].envFrom.filter(
               ef => ef.secretRef?.name !== storageName
@@ -1395,7 +1452,18 @@ defineExpose({
   getAllResources,
   clearCanvas,
   getNodes: () => nodes.value,
-  getEdges: () => edges.value
+  getEdges: () => edges.value,
+  centerView: () => {
+    // 使用 fitView 将画布内容居中显示，留出边距考虑侧边栏
+    // 右侧面板宽300px，需要更多左偏移
+    nextTick(() => {
+      fitView({ 
+        padding: { top: 0.1, bottom: 0.1, left: 0.05, right: 0.35 },
+        includeHiddenNodes: false,
+        duration: 300
+      })
+    })
+  }
 })
 </script>
 
@@ -1608,5 +1676,15 @@ defineExpose({
 
 .context-menu-item:hover {
   background: var(--bg-tertiary);
+}
+
+/* 边（连线）选中状态样式 */
+.vue-flow__edge.selected .vue-flow__edge-path {
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 4px var(--accent-light));
+}
+
+.vue-flow__edge:hover .vue-flow__edge-path {
+  stroke-width: 2 !important;
 }
 </style>

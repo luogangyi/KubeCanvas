@@ -533,7 +533,7 @@ UI 交互设计建议
 
 ```
 
-# day 7 可维护性、云交付性提升
+# day 6.5 可维护性、云交付性提升
 
 ```
 你是架构师，现在需要提升项目的可维护性和可交付性，请设计实现方案，至少包括增加控制台的日志输出、可配置的日志持久化、支持打包成docker等，并添加相关的配置和使用
@@ -565,7 +565,7 @@ docker日志报2026/01/14 14:09:17 [error] 11#11: *3 access forbidden by rule, c
 
 
 
-# day 8
+# day 7 优化各种校验逻辑
 
 ```
 优化下页面，在保留暗色风格的基础上，增加一个亮色风格，风格做成在配置文件中可以配置。此外，再检查下亮色风格和暗色风格下，是否页面上的所有元素都符合风格。
@@ -577,4 +577,193 @@ docker日志报2026/01/14 14:09:17 [error] 11#11: *3 access forbidden by rule, c
 
 ```
 测试成功，有2个优化的点，1）连线可以删除，删除的时候要同步删除对应的关系 2）组件通过鼠标，弹出删除选项，选择删除 
+```
+
+
+```
+前期实现的时候，漏了deamonset这个资源，参考deployment的实现，补充deamonset。
+```
+
+```
+Gemini: 我已经实现了基本功能，现在需要进一步优化操作体验，通过前端的校验，避免一些错误操作。比如Service不应该关联（连线）Configmap，Secret不应该关联（连线）PVC，自己不应该关联自己等等，请梳理K8s中各种资源（包括Namespace、Deployment、StatefulSet、Deamonset、Pod、service、ingress、pvc、configmap、Secret、job、cronjob）之间的关联关系，建议以矩阵形式输出。
+然后给出提示词，根据这个关系矩阵，对客户的连线操作提前进行校验。
+```
+
+
+```
+# Role: Kubernetes Visual Editor Logic Expert
+
+我正在开发 KubeCanvas 的连线功能。为了防止用户创建无效的 K8s 资源拓扑，我需要一个严格的连线校验逻辑。
+
+设计 K8s 资源编辑器的“连线规则”是保证配置正确性的关键。在 Kubernetes 的语义中，资源之间的关系通常是单向依赖或**选择（Selection）**关系。为了防止用户创建“Service 连接 ConfigMap”这种无效拓扑，我们需要建立一张合法的邻接矩阵（Adjacency Matrix）。1. K8s 资源关联关系矩阵 (Allowlist)这张表定义了：当用户从 A (Source) 拖拽连线到 B (Target) 时，在 K8s 语义上代表什么关系。 如果不在表中，即为非法操作。
+表格说明：
+Source (起点)：依赖方 / 发起方
+Target (终点)：被依赖方 / 被选择方
+关系类型：
+Selects: 标签选择器 (Label Selector)
+Mounts/Env: 挂载卷或环境变量引用
+Routes: 网络流量转发
+Template: 模板包含
+
+
+表格如下：
+起点 (Source),终点 (Target),关系含义,对应 K8s 字段示例
+Ingress,Service,路由转发,rules[].http.paths[].backend.service
+Service,Deployment,流量选择,spec.selector 匹配 template.labels
+Service,StatefulSet,流量选择,spec.selector 匹配 template.labels
+Service,DaemonSet,流量选择,spec.selector 匹配 template.labels
+Service,Pod,流量选择,spec.selector 匹配 metadata.labels
+Deployment,PVC,挂载存储,spec.template.spec.volumes[].persistentVolumeClaim
+Deployment,ConfigMap,挂载/注入,envFrom / volumes[].configMap
+Deployment,Secret,挂载/注入,envFrom / volumes[].secret / imagePullSecrets
+StatefulSet,PVC,挂载存储,spec.template.spec.volumes (亦可指代 ClaimTemplates)
+StatefulSet,ConfigMap,挂载/注入,同 Deployment
+StatefulSet,Secret,挂载/注入,同 Deployment
+StatefulSet,Service,Headless服务,spec.serviceName (STS 特有字段)
+DaemonSet,PVC / CM / Secret,挂载/注入,同 Deployment
+CronJob,PVC / CM / Secret,挂载/注入,jobTemplate.spec.template...
+Pod,PVC / CM / Secret,挂载/注入,spec.volumes
+Job,PVC / CM / Secret,挂载/注入,spec.template...
+
+2. 明确的非法操作 (Blocklist Rules)除了上述白名单，以下是必须在前端明确拦截的典型错误：
+1）禁止自环 (Self-loop)：任何资源都不能连接自己（例如 Deployment A 不能连 Deployment A）。
+2）禁止配置类资源互连：ConfigMap $\nrightarrow$ SecretSecret $\nrightarrow$ ConfigMapPVC $\nrightarrow$ ConfigMap
+3）禁止反向依赖：Pod $\nrightarrow$ Service (Pod 是被 Service 选择的，虽然 Pod 可以访问 Service IP，但拓扑图上通常画作 Service -> Pod)。PVC $\nrightarrow$ Deployment (存储是被工作负载挂载的)。
+4）禁止跨层级混乱：Ingress $\nrightarrow$ Pod (Ingress 必须指向 Service)。
+```
+
+
+```
+在前端 UI 实现上，除了校验，增加以下视觉引导：
+
+高亮可连接桩 (Port Highlighting)： 当你按住起始节点（如Deployment）的连线手柄开始拖拽时，只有合法的目标节点，如 Service/ ConfigMap/Secret/PVC (作为出站) 的节点高亮，其他无关节点（如 Ingress 或其他 Deployment）变暗或通过 CSS pointer-events: none 禁用。
+
+
+```
+
+- 求助一下Gemini
+
+```
+Gemini: 我已经完成了基本功能，需要对项目进行整体检查，增加对组件（包括Namespace、Deployment、StatefulSet、Deamonset、Pod、service、ingress、pvc、configmap、Secret、job、cronjob）操作的各种校验，
+校验 组件连线关联的时候，是否无论从哪个方向连线，都能通过设置Selector、volume等方式进行实际资源的关联。
+校验删除连线的时候，这些关联能正确删除。
+校验对恢复的组合中的组件进行修改的时候，是否不允许修改的字段，都已经设置成只读。
+校验对恢复的组合中的组件进行删除的时候，是否有关联组件，需要先删除关联组件，才允许删除（需要弹出提示）
+校验namespace删除的时候，是否有把namespace内部所有组件也都删除（需要弹出提示，让用户二次确认）
+校验新建场景下，组件删除的时候，已经有的连线和关联关系（如Selector、volume等）也正确删除
+
+请为我生成Prompt
+```
+
+
+
+```
+在 patch/update 时的不可变字段深度梳理：
+1. 核心原则 (通用规则)
+对于所有 K8s 资源，以下 Metadata 字段一旦创建，通常是绝对不可修改的：
+metadata.name: 资源名称。
+metadata.uid: 唯一标识符。
+metadata.creationTimestamp: 创建时间。
+metadata.namespace: 所属命名空间。
+2. 工作负载 (Workloads)
+这部分是最容易踩坑的，特别是 Deployment 和 StatefulSet 的区别。
+Pod
+Pod 被设计为相对“临时”的资源，其规范 (spec) 大部分是不可变的。
+不可修改字段 (Immutable):
+spec 下的绝大多数配置，例如：
+spec.containers[*].ports
+spec.containers[*].resources (CPU/Memory Request/Limit) 注：K8s v1.27+ 引入了 In-place Update Alpha 特性，但在标准生产环境中通常仍视为不可变。
+spec.containers[*].env
+spec.volumes
+spec.nodeName (一旦调度，不可修改)
+允许修改字段 (Mutable):
+spec.containers[*].image (这是最常用的修改)
+spec.activeDeadlineSeconds
+spec.tolerations (仅当之前未设置时可添加，部分情况受限)
+Deployment
+不可修改字段 (Immutable):
+spec.selector: 这是大坑。在 apps/v1 版本中，Label Selector 是不可变的。你不能更改 Deployment 纳管 Pod 的标签规则，除非删除重建。
+允许修改字段 (Mutable):
+spec.template: 修改模板会触发滚动更新 (Rolling Update)。
+spec.replicas
+spec.strategy
+StatefulSet
+StatefulSet 对状态要求极高，因此限制比 Deployment 更多。
+不可修改字段 (Immutable):
+spec.selector: 标签选择器。
+spec.volumeClaimTemplates: 极易踩坑。一旦创建，你不能修改存储卷的大小、StorageClass 等。若需扩容，需手动处理 PVC 或删除 StatefulSet（保留 Pod）后重建。
+spec.serviceName: 用于生成 DNS 的 Headless Service 名称。
+spec.podManagementPolicy
+允许修改字段 (Mutable):
+spec.template (触发滚动更新)
+spec.replicas
+DaemonSet
+不可修改字段 (Immutable):
+spec.selector
+允许修改字段 (Mutable):
+spec.template
+spec.updateStrategy
+Job
+Job 是一次性任务，设计上不期望被修改。
+不可修改字段 (Immutable):
+spec.template: 注意！ 与 Deployment 不同，Job 的 Pod 模板是不可变的。你不能更改正在运行或已完成 Job 的镜像。
+spec.selector
+spec.completions
+spec.parallelism (但在某些版本通过 patch 可能是允许动态调整的，取决于具体 K8s 版本，通常不建议改)
+CronJob
+CronJob 是生成 Job 的控制器。
+不可修改字段 (Immutable):
+无特殊限制。CronJob 主要是元数据配置。
+注意: 修改 spec.jobTemplate 里的字段是允许的，但这只会影响下一次触发的 Job，不会影响当前正在运行的 Job。
+3. 网络资源 (Networking)
+Service
+不可修改字段 (Immutable):
+spec.clusterIP: 除非你将其显式设置为 None (变 Headless) 或从 None 改回。你不能直接把 IP 从 10.96.0.1 改成 10.96.0.2。
+spec.ipFamilies: (双栈网络相关) 通常不可变。
+spec.selector: 注意，Service 的 Selector 是可以修改的（用于流量切换），但这一行为虽然合法，却要谨慎使用。
+特殊情况:
+spec.type: 可以修改（如 ClusterIP -> NodePort），但不能非法转换（如 ExternalName 转 ClusterIP 可能会受限）。
+Ingress
+Ingress 相对灵活，绝大多数字段（spec.rules, spec.tls, spec.ingressClassName）在符合规范的前提下都是允许修改的，Controller 会实时重新加载配置（如 Nginx Reload）。
+4. 存储与配置 (Storage & Config)
+PersistentVolumeClaim (PVC)
+PVC 的修改限制非常严格，因为它绑定了物理存储。
+不可修改字段 (Immutable):
+spec.storageClassName: 必须在创建时指定，之后不可改。
+spec.accessModes: (如 ReadWriteOnce 改为 ReadWriteMany) 通常不可改。
+spec.volumeName: 绑定的 PV 名称。
+spec.selector: 绑定的标签选择器。
+例外:
+spec.resources.requests.storage: 仅允许增加（扩容），且需要 StorageClass 支持 AllowVolumeExpansion。绝不允许减小。
+ConfigMap / Secret
+Data 内容: data 和 binaryData 字段是完全可修改的。
+不可修改字段: 主要是 Metadata。
+专家提示: 修改 ConfigMap/Secret 不会自动触发 Pod 重启（除非 Pod 也是通过某些 Operator 管理或应用自身监听了文件变化）。通常需要重建 Pod 才能挂载新的配置。
+Namespace
+不可修改字段 (Immutable):
+metadata.name: 命名空间名称绝对不可改。
+允许修改: Labels, Annotations, ResourceQuota 关联等。
+
+```
+
+```
+从保存的组合中恢复的时候，有些连线没有恢复，请统一检查一遍各组件之间的连线恢复逻辑
+
+```
+
+```
+我对一个恢复的组合，测试了删除其中一条连线，比如configmap到job的连线，测试发现点击“保存更新”正常，也提示“更新了一个组件”，但是实际上时没有更新的，下次恢复的时候，还是恢复了这条连线，请检查该问题，并排查同类问题
+```
+
+- 在修复一个弹不出提示的问题时，反复修改都没解决，人工给他一些思路
+```
+
+
+还是弹不出，能看到“部分失败：0 成功，1 失败”，是否是这个提示覆盖了“不可修改”的提示
+
+```
+
+- AI给出了回答，这次修复了问题（看来有时候还得看人的经验）
+```
+是的！第二个 toast "部分失败：0 成功，1 失败" 覆盖了第一个 "不可修改" 的提示。让我修复这个问题：
 ```

@@ -21,6 +21,43 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false, // 跳过 TLS 验证（开发环境）
           rewrite: (path) => path.replace(/^\/k8s-api/, ''),
+          configure: (proxy, options) => {
+            // 记录请求
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              const timestamp = new Date().toISOString()
+              console.log(`\n[${timestamp}] [K8s Proxy] --> ${req.method} ${req.url}`)
+
+              // 记录请求体（如果有）
+              if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
+                let bodyData = ''
+                req.on('data', (chunk) => {
+                  bodyData += chunk
+                })
+                req.on('end', () => {
+                  if (bodyData) {
+                    try {
+                      const parsed = JSON.parse(bodyData)
+                      console.log(`[${timestamp}] [K8s Proxy] Request Body:`, JSON.stringify(parsed, null, 2).substring(0, 2000))
+                    } catch (e) {
+                      console.log(`[${timestamp}] [K8s Proxy] Request Body (raw):`, bodyData.substring(0, 500))
+                    }
+                  }
+                })
+              }
+            })
+
+            // 记录响应
+            proxy.on('proxyRes', (proxyRes, req, res) => {
+              const timestamp = new Date().toISOString()
+              console.log(`[${timestamp}] [K8s Proxy] <-- ${proxyRes.statusCode} ${req.method} ${req.url}`)
+            })
+
+            // 记录错误
+            proxy.on('error', (err, req, res) => {
+              const timestamp = new Date().toISOString()
+              console.error(`[${timestamp}] [K8s Proxy] ERROR ${req.method} ${req.url}:`, err.message)
+            })
+          }
         },
       },
     },

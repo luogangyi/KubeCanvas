@@ -452,32 +452,77 @@ export function useK8sApi() {
             throw new Error(`Unsupported resource kind: ${kind}`)
         }
 
-        // 移除不应该在 patch 中发送的字段
-        const patchData = {
-            ...resource,
-            metadata: {
-                ...resource.metadata,
-                // 保留 resourceVersion 以支持乐观锁
-                resourceVersion: resource.metadata.resourceVersion || undefined,
-                // 移除只读字段
-                uid: undefined,
-                creationTimestamp: undefined,
-                managedFields: undefined,
-                selfLink: undefined,
-                generation: undefined
+        // 创建精简的 patch 数据，只包含可变字段
+        // 避免发送不可变字段导致 422 错误
+        let patchData = {}
+
+        // 对于不同资源类型，构建不同的 patch
+        if (kind === 'Job') {
+            // Job 的 spec.template 整体都是不可变的
+            // Kubernetes 不允许修改已创建的 Job 的模板
+            console.warn('[Patch] Skipping Job patch - Job template is immutable after creation')
+            throw new Error('Job 资源不可修改。如需更改，请删除后重新创建。')
+        } else if (kind === 'CronJob') {
+            // CronJob 可以修改大部分字段
+            patchData = {
+                spec: resource.spec
+            }
+        } else if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(kind)) {
+            // 工作负载的 selector 不可变，但 template 可变
+            patchData = {
+                spec: {
+                    replicas: resource.spec?.replicas,
+                    template: resource.spec?.template
+                }
+            }
+        } else if (kind === 'Service') {
+            // Service 的 clusterIP 不可变
+            const { clusterIP, clusterIPs, ipFamilies, ipFamilyPolicy, ...restSpec } = resource.spec || {}
+            patchData = {
+                spec: restSpec
+            }
+        } else if (kind === 'ConfigMap') {
+            patchData = {
+                data: resource.data
+            }
+        } else if (kind === 'Secret') {
+            patchData = {
+                data: resource.data,
+                stringData: resource.stringData
+            }
+        } else if (kind === 'PersistentVolumeClaim') {
+            // PVC 的大部分字段不可变，只有 resources.requests.storage 可能可扩展
+            patchData = {
+                spec: {
+                    resources: resource.spec?.resources
+                }
+            }
+        } else if (kind === 'Ingress') {
+            patchData = {
+                spec: resource.spec
+            }
+        } else {
+            // 默认：发送整个 spec
+            patchData = {
+                spec: resource.spec
             }
         }
 
-        // 清理 undefined 字段
-        Object.keys(patchData.metadata).forEach(key => {
-            if (patchData.metadata[key] === undefined) {
-                delete patchData.metadata[key]
-            }
-        })
+        // 添加 metadata（只包含必要字段）
+        patchData.metadata = {
+            labels: resource.metadata?.labels,
+            annotations: resource.metadata?.annotations
+        }
+
+        console.log('[MergePatch] Patching', kind, name, 'with targeted patch')
+        console.log('[MergePatch] Patch data volumes:', patchData.spec?.template?.spec?.volumes)
 
         const response = await client.patch(`${path}/${name}`, patchData, {
-            headers: { 'Content-Type': 'application/strategic-merge-patch+json' }
+            headers: { 'Content-Type': 'application/merge-patch+json' }
         })
+
+        console.log('[MergePatch] Response volumes:', response.data?.spec?.template?.spec?.volumes)
+
         return response.data
     }
 

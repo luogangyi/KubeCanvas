@@ -551,7 +551,7 @@ export const resourceTypes = [
         type: 'daemonset',
         name: 'DaemonSet',
         description: '每节点运行一个Pod',
-        icon: 'deploy',
+        icon: 'ds',
         color: '#7c3aed',
         category: 'workloads'
     },

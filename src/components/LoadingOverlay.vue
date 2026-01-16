@@ -78,10 +78,10 @@ const props = defineProps({
   background: var(--bg-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  padding: 32px 48px;
+  padding: 20px 32px;
   text-align: center;
   box-shadow: var(--shadow-xl);
-  min-width: 280px;
+  min-width: 180px;
 }
 
 .loading-container.success {
@@ -90,9 +90,9 @@ const props = defineProps({
 
 /* 加载动画 */
 .loading-spinner {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 16px;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
 }
 
 .spinner-icon {
@@ -125,10 +125,10 @@ const props = defineProps({
 }
 
 .loading-text {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 /* 进度条 */
@@ -137,9 +137,9 @@ const props = defineProps({
 }
 
 .progress-bar {
-  height: 6px;
+  height: 4px;
   background: var(--bg-tertiary);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -152,9 +152,9 @@ const props = defineProps({
 
 /* 成功状态 */
 .success-icon {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 16px;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
   background: rgba(34, 197, 94, 0.2);
   border-radius: 50%;
   display: flex;
@@ -165,8 +165,8 @@ const props = defineProps({
 }
 
 .success-icon svg {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
 }
 
 @keyframes scaleIn {
@@ -181,7 +181,7 @@ const props = defineProps({
 }
 
 .success-text {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   color: #22c55e;
 }

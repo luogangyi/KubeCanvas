@@ -3,7 +3,7 @@
     <!-- 头部 -->
     <header class="app-header">
       <div class="app-header__logo">
-        <img src="./assets/icons/kubecanvas-logo.png" alt="KubeCanvas" class="app-header__logo-icon" />
+        <img src="./assets/icons/kubecanvas-logo-new.png" alt="KubeCanvas" class="app-header__logo-icon" />
         <span>KubeCanvas</span>
       </div>
       
@@ -49,10 +49,12 @@
       @delete="deleteSelectedNode"
     />
     
-    <!-- Toast 通知 -->
-    <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">
-      {{ toast.message }}
-    </div>
+    <!-- Toast 通知 - Teleport 到 body 确保在最上层 -->
+    <Teleport to="body">
+      <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]" style="z-index: 9999 !important;">
+        {{ toast.message }}
+      </div>
+    </Teleport>
     
     <!-- 保存对话框 -->
     <SaveDialog
@@ -131,12 +133,13 @@ const toast = reactive({
 
 // 显示 Toast
 function showToast(message, type = 'success') {
+  console.log('[Toast] Showing toast:', message, 'type:', type)
   toast.message = message
   toast.type = type
   toast.show = true
   setTimeout(() => {
     toast.show = false
-  }, 3000)
+  }, 5000)  // 延长到 5 秒以便观察
 }
 
 // 节点选中
@@ -189,6 +192,41 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
   if (!nodeToDelete || !canvasRef.value) return
   
   const resource = nodeToDelete.data?.resource
+  
+  // Namespace 删除二次确认：检查是否有内部组件
+  if (nodeToDelete.type === 'namespace') {
+    const allNodes = canvasRef.value.getNodes()
+    const nsNode = nodeToDelete
+    const nsWidth = nsNode.data.width || 600
+    const nsHeight = nsNode.data.height || 450
+    
+    // 查找 Namespace 内部的组件
+    const childNodes = allNodes.filter(n => {
+      if (n.id === nsNode.id || n.type === 'namespace') return false
+      return n.position.x >= nsNode.position.x && 
+             n.position.x <= nsNode.position.x + nsWidth &&
+             n.position.y >= nsNode.position.y && 
+             n.position.y <= nsNode.position.y + nsHeight
+    })
+    
+    if (childNodes.length > 0) {
+      const confirmed = window.confirm(
+        `Namespace "${nsNode.data.name}" 内部有 ${childNodes.length} 个组件。\n删除 Namespace 将同时删除所有内部组件，是否继续？`
+      )
+      if (!confirmed) return
+      
+      // 删除所有内部组件
+      for (const childNode of childNodes) {
+        canvasRef.value.deleteNode(childNode.id)
+      }
+      showToast(`已删除 Namespace 及其 ${childNodes.length} 个内部组件`)
+    }
+    
+    // 删除 Namespace 自身
+    canvasRef.value.deleteNode(nodeToDelete.id)
+    selectedNode.value = null
+    return
+  }
   
   // 检查引用关系
   const referenceCheck = checkResourceReferences(nodeToDelete)
@@ -440,6 +478,16 @@ async function handleIncrementalSave() {
     return
   }
   
+  // Debug: 检查 Job 资源的 volumes
+  const jobResource = currentResources.find(r => r.kind === 'Job')
+  if (jobResource) {
+    console.log('[Save] Current Job volumes:', jobResource.spec?.template?.spec?.volumes)
+  }
+  const originalJob = originalResources.value.find(r => r.kind === 'Job')
+  if (originalJob) {
+    console.log('[Save] Original Job volumes:', originalJob.spec?.template?.spec?.volumes)
+  }
+  
   // 计算资源差异
   const { toCreate, toPatch, unchanged } = diffResources(originalResources.value, currentResources)
   
@@ -490,8 +538,11 @@ async function handleIncrementalSave() {
         results.push({ type: 'patch', resource: result })
         console.log(`Patched: ${resource.kind}/${resource.metadata.name}`)
       } catch (error) {
-        errors.push({ type: 'patch', resource, error: error.response?.data || error.message })
+        const errorMsg = error.message || error.response?.data?.message || '未知错误'
+        errors.push({ type: 'patch', resource, error: errorMsg })
         console.error(`Failed to patch ${resource.kind}/${resource.metadata.name}:`, error)
+        // 立即显示错误提示
+        showToast(`${resource.kind}/${resource.metadata.name}: ${errorMsg}`, 'error')
       }
     }
     
@@ -518,7 +569,7 @@ async function handleIncrementalSave() {
       await refreshCompositions()
     } else {
       loading.value = false
-      showToast(`部分失败：${results.length} 成功，${errors.length} 失败`, 'error')
+      // 不再显示重复的 toast，因为每条错误已经单独显示了
       console.error('Failed resources:', errors)
     }
   } catch (error) {
@@ -835,10 +886,38 @@ async function loadComposition(compositionId) {
     
     // 根据关系推断边
     const edges = []
+    const ingressNodesForEdges = nodes.filter(n => n.type === 'ingress')
     const serviceNodesForEdges = nodes.filter(n => n.type === 'service')
-    const workloadNodesForEdges = nodes.filter(n => ['deployment', 'statefulset', 'pod'].includes(n.type))
+    const workloadNodesForEdges = nodes.filter(n => ['deployment', 'statefulset', 'daemonset', 'pod', 'job', 'cronjob'].includes(n.type))
     const configMapNodesForEdges = nodes.filter(n => n.type === 'configmap')
     const secretNodesForEdges = nodes.filter(n => n.type === 'secret')
+    const pvcNodesForEdges = nodes.filter(n => n.type === 'pvc')
+    
+    // 0. Ingress -> Service (根据 backend.service.name 匹配)
+    ingressNodesForEdges.forEach(ingressNode => {
+      const rules = ingressNode.data.resource.spec?.rules || []
+      rules.forEach(rule => {
+        const paths = rule.http?.paths || []
+        paths.forEach(path => {
+          const serviceName = path.backend?.service?.name
+          if (serviceName) {
+            const serviceNode = serviceNodesForEdges.find(s => s.data.name === serviceName)
+            if (serviceNode) {
+              const handles = getBestHandles(ingressNode, serviceNode)
+              edges.push({
+                id: `e-ing-${ingressNode.id}-${serviceNode.id}`,
+                source: ingressNode.id,
+                target: serviceNode.id,
+                sourceHandle: handles.sourceHandle,
+                targetHandle: handles.targetHandle,
+                animated: false,
+                style: { strokeWidth: 1, stroke: '#3b82f6' }
+              })
+            }
+          }
+        })
+      })
+    })
     
     // 1. Service -> Workload (根据 selector 匹配)
     serviceNodesForEdges.forEach(serviceNode => {
@@ -863,16 +942,30 @@ async function loadComposition(compositionId) {
               target: workloadNode.id,
               sourceHandle: handles.sourceHandle,
               targetHandle: handles.targetHandle,
-              animated: false
+              animated: false,
+              style: { strokeWidth: 1, stroke: '#3b82f6' }
             })
           }
         })
       }
     })
     
-    // 2. Workload -> ConfigMap/Secret (根据 volumes 匹配)
+    // 获取 Pod Spec 的辅助函数
+    const getPodSpecForRestore = (nodeType, resource) => {
+      if (nodeType === 'pod') return resource.spec
+      if (['deployment', 'statefulset', 'daemonset', 'job'].includes(nodeType)) {
+        return resource.spec?.template?.spec
+      }
+      if (nodeType === 'cronjob') {
+        return resource.spec?.jobTemplate?.spec?.template?.spec
+      }
+      return null
+    }
+    
+    // 2. Workload -> ConfigMap/Secret/PVC (根据 volumes 匹配)
     workloadNodesForEdges.forEach(workloadNode => {
-      const volumes = workloadNode.data.resource.spec?.template?.spec?.volumes || []
+      const podSpec = getPodSpecForRestore(workloadNode.type, workloadNode.data.resource)
+      const volumes = podSpec?.volumes || []
       
       volumes.forEach(volume => {
         // ConfigMap volume
@@ -886,7 +979,8 @@ async function loadComposition(compositionId) {
               target: cmNode.id,
               sourceHandle: handles.sourceHandle,
               targetHandle: handles.targetHandle,
-              animated: false
+              animated: false,
+              style: { strokeWidth: 1, stroke: '#3b82f6' }
             })
           }
         }
@@ -902,7 +996,25 @@ async function loadComposition(compositionId) {
               target: secretNode.id,
               sourceHandle: handles.sourceHandle,
               targetHandle: handles.targetHandle,
-              animated: false
+              animated: false,
+              style: { strokeWidth: 1, stroke: '#3b82f6' }
+            })
+          }
+        }
+        
+        // PVC volume
+        if (volume.persistentVolumeClaim?.claimName) {
+          const pvcNode = pvcNodesForEdges.find(p => p.data.name === volume.persistentVolumeClaim.claimName)
+          if (pvcNode) {
+            const handles = getBestHandles(workloadNode, pvcNode)
+            edges.push({
+              id: `e-vol-${workloadNode.id}-${pvcNode.id}`,
+              source: workloadNode.id,
+              target: pvcNode.id,
+              sourceHandle: handles.sourceHandle,
+              targetHandle: handles.targetHandle,
+              animated: false,
+              style: { strokeWidth: 1, stroke: '#3b82f6' }
             })
           }
         }
@@ -925,6 +1037,13 @@ async function loadComposition(compositionId) {
     initialNodes.value = nodes
     initialEdges.value = edges
     currentCompositionId.value = compositionId
+    
+    // 居中显示画布内容
+    setTimeout(() => {
+      if (canvasRef.value?.centerView) {
+        canvasRef.value.centerView()
+      }
+    }, 500)
     
     // 1.5秒后隐藏
     setTimeout(() => {
