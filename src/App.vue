@@ -819,7 +819,7 @@ async function loadComposition(compositionId) {
           id: nsResource.metadata.uid || `ns-${nsIndex}`,
           type: 'namespace',
           position: { x: 50, y: currentY },
-          zIndex: 0,
+          zIndex: 6,
           data: {
             name: nsName,
             resource: nsResource,
@@ -827,6 +827,7 @@ async function loadComposition(compositionId) {
             height: nsHeight
           }
         }
+        console.log('[Restore] Creating Namespace node:', JSON.stringify(nsNode, null, 2))
         allNodes.push(nsNode)
         
         // 在 Namespace 内部创建子节点

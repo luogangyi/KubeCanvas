@@ -70,6 +70,7 @@
       :node-types="nodeTypes"
       :default-edge-options="defaultEdgeOptions"
       :connect-on-click="false"
+      :zoom-on-double-click="false"
       class="canvas"
       fit-view-on-init
       @nodes-change="onNodesChange"
@@ -272,9 +273,7 @@ function onRightClick(event) {
   const nodeEl = target.closest('.vue-flow__node')
   if (nodeEl) {
     const nodeId = nodeEl.getAttribute('data-id')
-    console.log('[ContextMenu] Right-click on node element, data-id:', nodeId)
     const node = findNode(nodeId)
-    console.log('[ContextMenu] findNode result:', node ? `Found: ${node.type}/${node.data?.name}` : 'NOT FOUND')
     if (node) {
       contextMenu.value = {
         visible: true,
@@ -321,12 +320,10 @@ function hideContextMenu() {
 
 // 全局鼠标按下事件处理 - 点击任何地方时隐藏上下文菜单
 function onDocumentMouseDown(event) {
-  console.log('[ContextMenu] mousedown event, button:', event.button, 'visible:', contextMenu.value.visible)
   // 右键不处理（让 onRightClick 处理）
   if (event.button === 2) return
   // 如果点击的是上下文菜单本身，不隐藏
   if (event.target.closest('.context-menu')) return
-  console.log('[ContextMenu] hiding menu')
   hideContextMenu()
 }
 
@@ -610,7 +607,7 @@ function onDrop(event) {
     type: resource.type,
     position: { x, y },
     // Namespace 放到底层（zIndex 较小），其他资源放到上层
-    zIndex: resource.type === 'namespace' ? 0 : 10,
+    zIndex: resource.type === 'namespace' ? 6 : 10,
     data: {
       name: nodeName,
       resource: resourceTemplate,
