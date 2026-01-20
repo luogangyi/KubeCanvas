@@ -1294,6 +1294,36 @@ function updateNodeData(nodeId, field, value) {
       break
     }
     
+    case 'initContainers': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.initContainers = value && value.length > 0 ? value : undefined
+      break
+    }
+    
+    case 'tolerations': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.tolerations = value && value.length > 0 ? value : undefined
+      break
+    }
+    
+    case 'affinity': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.affinity = value && Object.keys(value || {}).length > 0 ? value : undefined
+      break
+    }
+    
+    case 'hostNetwork': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.hostNetwork = value || undefined
+      break
+    }
+    
+    case 'dnsPolicy': {
+      const podSpec = ensurePodSpec()
+      if (podSpec) podSpec.dnsPolicy = value || undefined
+      break
+    }
+    
     // === Service 配置 ===
     case 'serviceType':
       resource.spec.type = value
@@ -1446,13 +1476,65 @@ function deleteNode(nodeId) {
 // 获取所有资源
 function getAllResources(compositionId) {
   return nodes.value.map(node => {
-    const resource = { ...node.data.resource }
+    const resource = JSON.parse(JSON.stringify(node.data.resource))
     if (!resource.metadata.labels) {
       resource.metadata.labels = {}
     }
     resource.metadata.labels['kubecanvas.io/composition'] = compositionId
     resource.metadata.labels['kubecanvas.io/managed-by'] = 'kubecanvas'
+    
+    // 清理无效容器（必须有 name 和 image）及其无效 volumeMounts
+    const cleanContainers = (containers) => {
+      if (!containers) return []
+      return containers.filter(c => c.name && c.image).map(c => {
+        // 清理无效的 volumeMounts（必须有 name 和 mountPath）
+        if (c.volumeMounts) {
+          c.volumeMounts = c.volumeMounts.filter(m => m.name && m.mountPath)
+          if (c.volumeMounts.length === 0) delete c.volumeMounts
+        }
+        return c
+      })
+    }
+    
+    // 根据资源类型清理容器
+    if (resource.spec?.template?.spec?.containers) {
+      resource.spec.template.spec.containers = cleanContainers(resource.spec.template.spec.containers)
+    }
+    if (resource.spec?.containers) {
+      resource.spec.containers = cleanContainers(resource.spec.containers)
+    }
+    if (resource.spec?.jobTemplate?.spec?.template?.spec?.containers) {
+      resource.spec.jobTemplate.spec.template.spec.containers = cleanContainers(resource.spec.jobTemplate.spec.template.spec.containers)
+    }
+    
+    // 清理无效 initContainers
+    if (resource.spec?.template?.spec?.initContainers) {
+      resource.spec.template.spec.initContainers = cleanContainers(resource.spec.template.spec.initContainers)
+      if (resource.spec.template.spec.initContainers.length === 0) {
+        delete resource.spec.template.spec.initContainers
+      }
+    }
+    if (resource.spec?.initContainers) {
+      resource.spec.initContainers = cleanContainers(resource.spec.initContainers)
+      if (resource.spec.initContainers.length === 0) {
+        delete resource.spec.initContainers
+      }
+    }
+    if (resource.spec?.jobTemplate?.spec?.template?.spec?.initContainers) {
+      resource.spec.jobTemplate.spec.template.spec.initContainers = cleanContainers(resource.spec.jobTemplate.spec.template.spec.initContainers)
+      if (resource.spec.jobTemplate.spec.template.spec.initContainers.length === 0) {
+        delete resource.spec.jobTemplate.spec.template.spec.initContainers
+      }
+    }
+    
     return resource
+  })
+}
+
+// 获取原始资源（不清理容器，用于验证）
+function getRawResources() {
+  return nodes.value.map(node => {
+    return JSON.parse(JSON.stringify(node.data.resource))
   })
 }
 
@@ -1468,6 +1550,7 @@ defineExpose({
   updateNodeData,
   deleteNode,
   getAllResources,
+  getRawResources,
   clearCanvas,
   getNodes: () => nodes.value,
   getEdges: () => edges.value,

@@ -321,6 +321,19 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
     return
   }
   
+  // Debug: 完全追踪删除条件
+  console.log('[Delete Debug - Full Trace]', {
+    nodeId: nodeToDelete.id,
+    nodeType: nodeToDelete.type,
+    currentCompositionName: currentCompositionName.value,
+    hasResource: !!resource,
+    resourceKind: resource?.kind,
+    resourceName: resource?.metadata?.name,
+    resourceVersion: resource?.metadata?.resourceVersion,
+    resourceNamespace: resource?.metadata?.namespace,
+    conditionMet: !!(currentCompositionName.value && resource?.metadata?.resourceVersion)
+  })
+  
   // 如果是已保存的资源（有 resourceVersion），从 K8s 删除
   if (currentCompositionName.value && resource?.metadata?.resourceVersion) {
     try {
@@ -329,16 +342,19 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
       loadingProgress.value = 30
       loadingSuccess.value = false
       
+      console.log('[Delete] Calling deleteResource with:', {
+        kind: resource.kind,
+        name: resource.metadata.name,
+        namespace: resource.metadata.namespace
+      })
       await deleteResource(resource.kind, resource.metadata.name, resource.metadata.namespace)
       
       loadingProgress.value = 100
       loadingSuccess.value = true
       successMessage.value = `已删除 ${resource.kind}/${resource.metadata.name}`
       
-      // 从原始资源快照中移除
-      const resourceKey = r => `${r.kind}/${r.metadata?.namespace || ''}/${r.metadata?.name || ''}`
-      const keyToRemove = resourceKey(resource)
-      originalResources.value = originalResources.value.filter(r => resourceKey(r) !== keyToRemove)
+      // 注意：不再同步更新 originalResources，让保存操作能检测到删除
+      // 保存成功后会更新 originalResources
       
       setTimeout(() => {
         loading.value = false
@@ -488,6 +504,14 @@ async function handleSaveConfirm(compositionName) {
     return
   }
   
+  // 验证容器必填字段（使用原始资源）
+  const rawResources = canvasRef.value.getRawResources()
+  const containerErrors = validateContainerFields(rawResources)
+  if (containerErrors.length > 0) {
+    showToast(containerErrors.join('\n'), 'error')
+    return
+  }
+  
   // 验证 Ingress 资源的 backend 配置
   const invalidIngresses = resources.filter(r => {
     if (r.kind !== 'Ingress') return false
@@ -564,6 +588,14 @@ async function handleIncrementalSave() {
     return
   }
   
+  // 验证容器必填字段（使用原始资源，因为 getAllResources 会过滤掉无效容器）
+  const rawResources = canvasRef.value.getRawResources()
+  const validationErrors = validateContainerFields(rawResources)
+  if (validationErrors.length > 0) {
+    showToast(validationErrors.join('\n'), 'error')
+    return
+  }
+  
   // Debug: 检查 Job 资源的 volumes
   const jobResource = currentResources.find(r => r.kind === 'Job')
   if (jobResource) {
@@ -575,11 +607,11 @@ async function handleIncrementalSave() {
   }
   
   // 计算资源差异
-  const { toCreate, toPatch, unchanged } = diffResources(originalResources.value, currentResources)
+  const { toCreate, toPatch, toDelete, unchanged } = diffResources(originalResources.value, currentResources)
   
-  console.log('Resource diff:', { toCreate: toCreate.length, toPatch: toPatch.length, unchanged: unchanged.length })
+  console.log('Resource diff:', { toCreate: toCreate.length, toPatch: toPatch.length, toDelete: toDelete.length, unchanged: unchanged.length })
   
-  if (toCreate.length === 0 && toPatch.length === 0) {
+  if (toCreate.length === 0 && toPatch.length === 0 && toDelete.length === 0) {
     showToast('没有需要保存的更改')
     return
   }
@@ -634,19 +666,52 @@ async function handleIncrementalSave() {
     
     loadingProgress.value = 70
     
+    // 3. 删除被移除的资源（Namespace 最后删除）
+    const sortedToDelete = [...toDelete].sort((a, b) => {
+      if (a.kind === 'Namespace' && b.kind !== 'Namespace') return 1
+      if (a.kind !== 'Namespace' && b.kind === 'Namespace') return -1
+      return 0
+    })
+    
+    for (const resource of sortedToDelete) {
+      try {
+        console.log(`[IncrementalSave] Deleting: ${resource.kind}/${resource.metadata.name}`)
+        await deleteResource(resource.kind, resource.metadata.name, resource.metadata.namespace)
+        results.push({ type: 'delete', resource })
+        console.log(`Deleted: ${resource.kind}/${resource.metadata.name}`)
+      } catch (error) {
+        // 404 表示资源已不存在，不算错误
+        if (error.response?.status === 404) {
+          console.log(`Resource already deleted: ${resource.kind}/${resource.metadata.name}`)
+          results.push({ type: 'delete', resource })
+        } else {
+          const errorMsg = error.message || error.response?.data?.message || '未知错误'
+          errors.push({ type: 'delete', resource, error: errorMsg })
+          console.error(`Failed to delete ${resource.kind}/${resource.metadata.name}:`, error)
+          showToast(`删除 ${resource.kind}/${resource.metadata.name} 失败: ${errorMsg}`, 'error')
+        }
+      }
+    }
+    
+    loadingProgress.value = 85
+    
     if (errors.length === 0) {
-      // 更新注册表
-      const allResources = [...unchanged, ...results.map(r => r.resource)]
-      const firstResource = allResources.find(r => r.metadata?.namespace)
+      // 更新注册表 - 使用 currentResources 的数量，它已经排除了被删除的资源
+      const firstResource = currentResources.find(r => r.metadata?.namespace)
       const namespace = firstResource?.metadata?.namespace || 'default'
-      await updateCompositionsRegistry(currentCompositionId.value, namespace, allResources.length, currentCompositionName.value)
+      await updateCompositionsRegistry(currentCompositionId.value, namespace, currentResources.length, currentCompositionName.value)
       
       // 更新原始资源快照
       originalResources.value = currentResources.map(r => JSON.parse(JSON.stringify(r)))
       
       loadingProgress.value = 100
       loadingSuccess.value = true
-      successMessage.value = `已更新！创建 ${toCreate.length} 个，修改 ${toPatch.length} 个资源`
+      // 生成友好的成功消息
+      const changes = []
+      if (toCreate.length > 0) changes.push(`创建 ${toCreate.length} 个`)
+      if (toPatch.length > 0) changes.push(`修改 ${toPatch.length} 个`)
+      if (toDelete.length > 0) changes.push(`删除 ${toDelete.length} 个`)
+      successMessage.value = `已更新！${changes.join('，')}资源`
       
       setTimeout(() => {
         loading.value = false
@@ -667,6 +732,67 @@ async function handleIncrementalSave() {
   }
 }
 
+// 验证容器必填字段（在保存前调用）
+function validateContainerFields(resources) {
+  const errors = []
+  
+  for (const resource of resources) {
+    const kind = resource.kind
+    const name = resource.metadata?.name || '未命名'
+    
+    // 获取容器列表的路径取决于资源类型
+    const getContainerPaths = () => {
+      switch (kind) {
+        case 'Deployment':
+        case 'DaemonSet':
+        case 'StatefulSet':
+        case 'ReplicaSet':
+          return [
+            { path: resource.spec?.template?.spec?.containers, label: '容器' },
+            { path: resource.spec?.template?.spec?.initContainers, label: 'Init容器' }
+          ]
+        case 'Pod':
+          return [
+            { path: resource.spec?.containers, label: '容器' },
+            { path: resource.spec?.initContainers, label: 'Init容器' }
+          ]
+        case 'Job':
+          return [
+            { path: resource.spec?.template?.spec?.containers, label: '容器' },
+            { path: resource.spec?.template?.spec?.initContainers, label: 'Init容器' }
+          ]
+        case 'CronJob':
+          return [
+            { path: resource.spec?.jobTemplate?.spec?.template?.spec?.containers, label: '容器' },
+            { path: resource.spec?.jobTemplate?.spec?.template?.spec?.initContainers, label: 'Init容器' }
+          ]
+        default:
+          return []
+      }
+    }
+    
+    const containerPaths = getContainerPaths()
+    
+    for (const { path, label } of containerPaths) {
+      if (!path || path.length === 0) continue
+      
+      path.forEach((container, index) => {
+        const containerName = container.name || `#${index + 1}`
+        const missingFields = []
+        
+        if (!container.name) missingFields.push('名称')
+        if (!container.image) missingFields.push('镜像')
+        
+        if (missingFields.length > 0) {
+          errors.push(`${kind}/${name} 的${label} "${containerName}" 缺少必填字段: ${missingFields.join(', ')}`)
+        }
+      })
+    }
+  }
+  
+  return errors
+}
+
 // 资源差异计算
 function diffResources(original, current) {
   const resourceKey = (r) => `${r.kind}/${r.metadata?.namespace || ''}/${r.metadata?.name || ''}`
@@ -676,8 +802,10 @@ function diffResources(original, current) {
   
   const toCreate = []
   const toPatch = []
+  const toDelete = []
   const unchanged = []
   
+  // 检查当前资源：新增或修改
   for (const [key, resource] of currentMap) {
     if (!originalMap.has(key)) {
       // 新资源
@@ -694,7 +822,14 @@ function diffResources(original, current) {
     }
   }
   
-  return { toCreate, toPatch, unchanged }
+  // 检查已删除的资源：在原始中存在但当前不存在
+  for (const [key, resource] of originalMap) {
+    if (!currentMap.has(key)) {
+      toDelete.push(resource)
+    }
+  }
+  
+  return { toCreate, toPatch, toDelete, unchanged }
 }
 
 // 检查资源是否已修改（比较 spec）

@@ -778,3 +778,9 @@ metadata.name: 命名空间名称绝对不可改。
 4）部署文档中，增加nodeport启动方式的介绍，我已经补充配置文件到deploy/03-service-nodeport.yaml中了
 5）用docker 镜像启动后，看不到和后端K8s集群交互的日志
 ```
+
+# day 8 bug修复、资源属性字段优化
+
+```
+资源下属的字段和关系，还不太正确，比如应该是如下关系Deployment->spec（DeploymentSpec）->template(PodTemplateSpec)->spec(PodSpec)->containers 。请重新梳理属性字段之间的关系，另外还有一些缺少的字段，比如initcontainer之类的
+```

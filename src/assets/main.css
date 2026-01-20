@@ -702,8 +702,8 @@ body {
 .form-textarea {
   width: 100%;
   padding: 9px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hover);
   border-radius: var(--radius-sm);
   font-size: 13px;
   color: var(--text-primary);
@@ -714,8 +714,9 @@ body {
 .form-select:focus,
 .form-textarea:focus {
   outline: none;
+  background: var(--bg-primary);
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.25), 0 0 12px rgba(0, 112, 243, 0.15);
 }
 
 .form-input::placeholder,

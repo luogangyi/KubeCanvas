@@ -541,8 +541,22 @@ export function useK8sApi() {
             throw new Error(`Unsupported resource kind: ${kind}`)
         }
 
-        const response = await client.delete(`${path}/${name}`)
-        return response.data
+        const fullPath = `${path}/${name}`
+        console.log('[DeleteResource] Sending DELETE request:', { kind, name, namespace: ns, path: fullPath })
+
+        try {
+            const response = await client.delete(fullPath)
+            console.log('[DeleteResource] Success response:', { status: response.status, data: response.data })
+            return response.data
+        } catch (error) {
+            console.error('[DeleteResource] Error:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                message: error.message
+            })
+            throw error
+        }
     }
 
     // 删除整个资源组合

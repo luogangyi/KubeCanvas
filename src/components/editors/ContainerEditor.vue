@@ -15,7 +15,7 @@
           @input="emitChange"
         />
         <button 
-          v-if="localContainers.length > 1"
+          v-if="isInitContainer || localContainers.length > 1"
           class="btn-icon btn-remove" 
           @click="removeContainer(index)" 
           title="删除容器"
@@ -166,6 +166,10 @@ const props = defineProps({
   volumes: {
     type: Array,
     default: () => []
+  },
+  isInitContainer: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -207,13 +211,15 @@ watch(() => props.modelValue, (newVal) => {
     volumeMounts: c.volumeMounts || []
   }))
   
-  if (localContainers.value.length === 0) {
+  // 只对普通容器自动添加默认容器，initContainers 可以为空
+  if (localContainers.value.length === 0 && !props.isInitContainer) {
     localContainers.value = [defaultContainer()]
   }
 }, { immediate: true, deep: true })
 
 function addContainer() {
   localContainers.value.push(defaultContainer())
+  // 立即 emit 以便验证能检测到空容器
   emitChange()
 }
 
@@ -223,26 +229,26 @@ function removeContainer(index) {
 }
 
 function emitChange() {
-  const containers = localContainers.value
-    .filter(c => c.name && c.image)
-    .map(c => {
-      const result = {
-        name: c.name,
-        image: c.image
-      }
-      if (c.imagePullPolicy) result.imagePullPolicy = c.imagePullPolicy
-      if (c.workingDir) result.workingDir = c.workingDir
-      if (c.command?.length) result.command = c.command
-      if (c.args?.length) result.args = c.args
-      if (c.ports?.length) result.ports = c.ports
-      if (c.env?.length) result.env = c.env
-      if (c.resources && Object.keys(c.resources).length) result.resources = c.resources
-      if (c.livenessProbe) result.livenessProbe = c.livenessProbe
-      if (c.readinessProbe) result.readinessProbe = c.readinessProbe
-      if (c.startupProbe) result.startupProbe = c.startupProbe
-      if (c.volumeMounts?.length) result.volumeMounts = c.volumeMounts
-      return result
-    })
+  // 编辑时不过滤，保留所有容器让用户填写
+  // 验证应在最终保存到 K8s 时进行
+  const containers = localContainers.value.map(c => {
+    const result = {
+      name: c.name || '',
+      image: c.image || ''
+    }
+    if (c.imagePullPolicy) result.imagePullPolicy = c.imagePullPolicy
+    if (c.workingDir) result.workingDir = c.workingDir
+    if (c.command?.length) result.command = c.command
+    if (c.args?.length) result.args = c.args
+    if (c.ports?.length) result.ports = c.ports
+    if (c.env?.length) result.env = c.env
+    if (c.resources && Object.keys(c.resources).length) result.resources = c.resources
+    if (c.livenessProbe) result.livenessProbe = c.livenessProbe
+    if (c.readinessProbe) result.readinessProbe = c.readinessProbe
+    if (c.startupProbe) result.startupProbe = c.startupProbe
+    if (c.volumeMounts?.length) result.volumeMounts = c.volumeMounts
+    return result
+  })
   emit('update:modelValue', containers)
 }
 </script>

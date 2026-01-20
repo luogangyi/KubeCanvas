@@ -100,17 +100,17 @@ function removeMount(index) {
 }
 
 function emitChange() {
-  const mounts = localMounts.value
-    .filter(m => m.name && m.mountPath)
-    .map(m => {
-      const result = {
-        name: m.name,
-        mountPath: m.mountPath
-      }
-      if (m.subPath) result.subPath = m.subPath
-      if (m.readOnly) result.readOnly = true
-      return result
-    })
+  // 编辑时不过滤，保留所有挂载让用户填写
+  // 验证应在最终保存到 K8s 时进行
+  const mounts = localMounts.value.map(m => {
+    const result = {
+      name: m.name || '',
+      mountPath: m.mountPath || ''
+    }
+    if (m.subPath) result.subPath = m.subPath
+    if (m.readOnly) result.readOnly = true
+    return result
+  })
   emit('update:modelValue', mounts)
 }
 </script>
