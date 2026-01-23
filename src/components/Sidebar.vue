@@ -106,10 +106,11 @@
       </div>
       
       <!-- 已保存的资源组合 -->
-      <div class="composition-list" v-if="compositions.length > 0">
-        <div class="section-title">已保存的组合</div>
+      <!-- 已保存的资源组合 -->
+      <div class="composition-list" v-if="recentCompositions.length > 0">
+        <div class="section-title">最近的组合</div>
         <div
-          v-for="composition in compositions"
+          v-for="composition in recentCompositions"
           :key="composition.id"
           class="composition-item"
           @click="$emit('loadComposition', composition.id)"
@@ -117,6 +118,16 @@
           <div class="composition-item__icon">📋</div>
           <div class="composition-item__name">{{ composition.name }}</div>
           <div class="composition-item__count">{{ composition.resourceCount }}</div>
+        </div>
+        
+        <div 
+          v-if="compositions.length > 5" 
+          class="composition-item view-more"
+          @click="$emit('openLibrary')"
+        >
+          <div class="composition-item__icon">📚</div>
+          <div class="composition-item__name">查看全部 ({{ compositions.length }})</div>
+          <div class="composition-item__count">→</div>
         </div>
       </div>
     </div>
@@ -167,19 +178,26 @@ const iconMap = {
   ds: dsIcon
 }
 
-defineProps({
+const props = defineProps({
   compositions: {
     type: Array,
     default: () => []
   }
 })
 
-defineEmits(['loadComposition'])
+defineEmits(['loadComposition', 'openLibrary'])
 
 // 获取图标 URL
 function getIconUrl(iconName) {
   return iconMap[iconName] || deployIcon
 }
+
+// 最近的组合（最多显示5个）
+const recentCompositions = computed(() => {
+  return [...props.compositions]
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+    .slice(0, 5)
+})
 
 // Tooltip 状态
 const tooltip = ref({
@@ -270,6 +288,24 @@ function onDragStart(event, resource) {
 .resource-card:active {
   cursor: grabbing;
   transform: scale(0.98);
+}
+
+.view-more {
+  margin-top: 4px;
+  background: transparent !important;
+  border: 1px dashed var(--border-default) !important;
+  color: var(--text-secondary);
+  justify-content: center;
+}
+
+.view-more:hover {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary);
+}
+
+.view-more .composition-item__icon {
+  margin-right: 4px;
 }
 
 .resource-card__icon {

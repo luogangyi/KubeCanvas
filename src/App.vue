@@ -24,6 +24,7 @@
     <Sidebar
       :compositions="compositions"
       @loadComposition="loadComposition"
+      @openLibrary="showLibraryModal = true"
     />
     
     <!-- 画布 -->
@@ -63,6 +64,15 @@
       @cancel="showSaveDialog = false"
     />
     
+    <!-- 资源组合库 -->
+    <CompositionLibrary
+      :visible="showLibraryModal"
+      :compositions="compositions"
+      @close="showLibraryModal = false"
+      @load="loadComposition"
+      @delete="handleDeleteComposition"
+    />
+    
     <!-- 加载状态覆盖层 -->
     <LoadingOverlay
       :visible="loading"
@@ -81,10 +91,11 @@ import Canvas from './components/Canvas.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import SaveDialog from './components/SaveDialog.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
+import CompositionLibrary from './components/CompositionLibrary.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
 
-const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, patchResource, deleteResource } = useK8sApi()
+const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, patchResource, deleteResource, deleteComposition } = useK8sApi()
 
 // 画布引用
 const canvasRef = ref(null)
@@ -116,6 +127,9 @@ const saving = ref(false)
 
 // 保存对话框
 const showSaveDialog = ref(false)
+
+// 资源组合库显示状态
+const showLibraryModal = ref(false)
 
 // 加载状态覆盖层
 const loading = ref(false)
@@ -856,6 +870,37 @@ async function refreshCompositions() {
     compositions.value = await listCompositions()
   } catch (error) {
     console.error('Failed to load compositions:', error)
+  }
+}
+
+// 删除资源组合
+async function handleDeleteComposition(compositionId, namespace) {
+  loading.value = true
+  loadingMessage.value = '删除中...'
+  
+  try {
+    const { deleted, errors } = await deleteComposition(compositionId, namespace)
+    
+    if (errors.length > 0) {
+      console.warn('Partial delete errors:', errors)
+      showToast(`删除了 ${deleted} 个资源，但有 ${errors.length} 个失败`, 'warning')
+    } else {
+      showToast('资源组合已删除', 'success')
+      
+      // 如果删除的是当前加载的组合，清空画布
+      if (currentCompositionId.value === compositionId) {
+        clearCanvas()
+      }
+    }
+    
+    // 刷新列表
+    await refreshCompositions()
+    
+  } catch (error) {
+    console.error('Delete composition failed:', error)
+    showToast(`删除失败: ${error.message}`, 'error')
+  } finally {
+    loading.value = false
   }
 }
 
