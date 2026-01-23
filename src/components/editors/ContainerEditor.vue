@@ -82,9 +82,14 @@
           <EnvEditor v-model="container.env" @update:modelValue="emitChange" />
         </CollapsibleSection>
         
-        <!-- 资源限制 -->
-        <CollapsibleSection title="资源限制">
+        <!-- 资源配置 -->
+        <CollapsibleSection title="资源配置">
           <ResourceEditor v-model="container.resources" @update:modelValue="emitChange" />
+        </CollapsibleSection>
+        
+        <!-- 安全上下文 -->
+        <CollapsibleSection title="🔐 安全上下文 (SecurityContext)">
+          <SecurityContextEditor v-model="container.securityContext" @update:modelValue="emitChange" />
         </CollapsibleSection>
         
         <!-- 健康检查 -->
@@ -157,6 +162,7 @@ import EnvEditor from './EnvEditor.vue'
 import ResourceEditor from './ResourceEditor.vue'
 import ProbeEditor from './ProbeEditor.vue'
 import VolumeMountEditor from './VolumeMountEditor.vue'
+import SecurityContextEditor from './SecurityContextEditor.vue'
 
 const props = defineProps({
   modelValue: {
@@ -188,6 +194,7 @@ const defaultContainer = () => ({
   ports: [],
   env: [],
   resources: {},
+  securityContext: {},
   livenessProbe: null,
   readinessProbe: null,
   startupProbe: null,
@@ -205,6 +212,7 @@ watch(() => props.modelValue, (newVal) => {
     ports: c.ports || [],
     env: c.env || [],
     resources: c.resources || {},
+    securityContext: c.securityContext || {},
     livenessProbe: c.livenessProbe || null,
     readinessProbe: c.readinessProbe || null,
     startupProbe: c.startupProbe || null,
@@ -243,6 +251,7 @@ function emitChange() {
     if (c.ports?.length) result.ports = c.ports
     if (c.env?.length) result.env = c.env
     if (c.resources && Object.keys(c.resources).length) result.resources = c.resources
+    if (c.securityContext && Object.keys(c.securityContext).length) result.securityContext = c.securityContext
     if (c.livenessProbe) result.livenessProbe = c.livenessProbe
     if (c.readinessProbe) result.readinessProbe = c.readinessProbe
     if (c.startupProbe) result.startupProbe = c.startupProbe

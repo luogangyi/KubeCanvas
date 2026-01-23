@@ -1487,24 +1487,79 @@ function getAllResources(compositionId) {
     const cleanContainers = (containers) => {
       if (!containers) return []
       return containers.filter(c => c.name && c.image).map(c => {
+        // 深度拷贝
+        const container = { ...c }
+        
         // 清理无效的 volumeMounts（必须有 name 和 mountPath）
-        if (c.volumeMounts) {
-          c.volumeMounts = c.volumeMounts.filter(m => m.name && m.mountPath)
-          if (c.volumeMounts.length === 0) delete c.volumeMounts
+        if (container.volumeMounts) {
+          container.volumeMounts = container.volumeMounts.filter(m => m.name && m.mountPath)
+          if (container.volumeMounts.length === 0) delete container.volumeMounts
         }
-        return c
+        
+        // 清理空资源限制
+        if (container.resources) {
+          if (!container.resources.requests || Object.keys(container.resources.requests).length === 0) {
+            delete container.resources.requests
+          }
+          if (!container.resources.limits || Object.keys(container.resources.limits).length === 0) {
+            delete container.resources.limits
+          }
+          if (Object.keys(container.resources).length === 0) {
+            delete container.resources
+          }
+        }
+        
+        // 清理空安全上下文
+        if (container.securityContext) {
+          // 清理 capabilities
+          if (container.securityContext.capabilities) {
+            if (!container.securityContext.capabilities.add || container.securityContext.capabilities.add.length === 0) {
+              delete container.securityContext.capabilities.add
+            }
+            if (!container.securityContext.capabilities.drop || container.securityContext.capabilities.drop.length === 0) {
+              delete container.securityContext.capabilities.drop
+            }
+            if (Object.keys(container.securityContext.capabilities).length === 0) {
+              delete container.securityContext.capabilities
+            }
+          }
+          if (Object.keys(container.securityContext).length === 0) {
+            delete container.securityContext
+          }
+        }
+        
+        return container
       })
+    }
+    
+    // 清理 Pod 级配置的辅助函数
+    const cleanPodSpec = (spec) => {
+      // 清理 Pod 安全上下文
+      if (spec.securityContext && Object.keys(spec.securityContext).length === 0) {
+        delete spec.securityContext
+      }
+      
+      // 清理 ImagePullSecrets
+      if (spec.imagePullSecrets) {
+        spec.imagePullSecrets = spec.imagePullSecrets.filter(s => s) 
+        if (spec.imagePullSecrets.length === 0) {
+          delete spec.imagePullSecrets
+        }
+      }
     }
     
     // 根据资源类型清理容器
     if (resource.spec?.template?.spec?.containers) {
       resource.spec.template.spec.containers = cleanContainers(resource.spec.template.spec.containers)
+      cleanPodSpec(resource.spec.template.spec)
     }
     if (resource.spec?.containers) {
       resource.spec.containers = cleanContainers(resource.spec.containers)
+      cleanPodSpec(resource.spec)
     }
     if (resource.spec?.jobTemplate?.spec?.template?.spec?.containers) {
       resource.spec.jobTemplate.spec.template.spec.containers = cleanContainers(resource.spec.jobTemplate.spec.template.spec.containers)
+      cleanPodSpec(resource.spec.jobTemplate.spec.template.spec)
     }
     
     // 清理无效 initContainers

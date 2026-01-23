@@ -28,9 +28,10 @@ description: 当需要保存 AI 生成的 plan、task list、walkthrough、archi
 4. 描述部分用 kebab-case，长度建议 8–40 个字符，清晰反映主要内容
 5. 扩展名统一用 `.md`
 
+
 ## 文档内容格式要求（输出时必须包含）
 
-每个保存的文档开头**必须**有 YAML frontmatter：
+内容使用简体中文，每个保存的文档开头**必须**有 YAML frontmatter：
 
 ```yaml
 ---

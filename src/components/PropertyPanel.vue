@@ -107,54 +107,73 @@
             </div>
           </div>
           
-          <div class="form-group">
-            <label class="form-label">ServiceAccount</label>
-            <input
-              type="text"
-              class="form-input"
-              v-model="localData.serviceAccountName"
-              @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
-              placeholder="default"
-            />
-          </div>
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="💾 Volumes">
-          <VolumeEditor 
-            v-model="localData.volumes" 
-            @update:modelValue="v => emitUpdate('volumes', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
-          <ContainerEditor 
-            v-model="localData.initContainers" 
-            :volumes="localData.volumes"
-            :isInitContainer="true"
-            @update:modelValue="v => emitUpdate('initContainers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
-          <ContainerEditor 
-            v-model="localData.containers" 
-            :volumes="localData.volumes"
-            @update:modelValue="v => emitUpdate('containers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
-          <TolerationsEditor 
-            v-model="localData.tolerations"
-            @update:modelValue="v => emitUpdate('tolerations', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="📍 Affinity">
-          <AffinityEditor 
-            v-model="localData.affinity"
-            @update:modelValue="v => emitUpdate('affinity', v)" 
-          />
+          
+          <CollapsibleSection title="Pod 模板配置 (Pod Template)" :defaultExpanded="true">
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+                placeholder="default"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">ImagePullSecrets</label>
+              <ListEditor 
+                v-model="localData.imagePullSecrets"
+                placeholder="secret-name"
+                @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+              />
+            </div>
+            
+            <CollapsibleSection title="🔐 Pod 安全上下文">
+              <PodSecurityContextEditor 
+                v-model="localData.securityContext"
+                @update:modelValue="v => emitUpdate('securityContext', v)" 
+              />
+            </CollapsibleSection>
+          
+            <CollapsibleSection title="💾 Volumes">
+              <VolumeEditor 
+                v-model="localData.volumes" 
+                @update:modelValue="v => emitUpdate('volumes', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
+              <ContainerEditor 
+                v-model="localData.initContainers" 
+                :volumes="localData.volumes"
+                :isInitContainer="true"
+                @update:modelValue="v => emitUpdate('initContainers', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+              <ContainerEditor 
+                v-model="localData.containers" 
+                :volumes="localData.volumes"
+                @update:modelValue="v => emitUpdate('containers', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
+              <TolerationsEditor 
+                v-model="localData.tolerations"
+                @update:modelValue="v => emitUpdate('tolerations', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="📍 Affinity">
+              <AffinityEditor 
+                v-model="localData.affinity"
+                @update:modelValue="v => emitUpdate('affinity', v)" 
+              />
+            </CollapsibleSection>
+          </CollapsibleSection>
         </CollapsibleSection>
       </template>
       
@@ -174,7 +193,34 @@
               </select>
             </div>
           </div>
-        </CollapsibleSection>
+          
+          <CollapsibleSection title="Pod 模板配置 (Pod Template)" :defaultExpanded="true">
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+                placeholder="default"
+              />
+            </div>
+
+          <div class="form-group">
+            <label class="form-label">ImagePullSecrets</label>
+            <ListEditor 
+              v-model="localData.imagePullSecrets"
+              placeholder="secret-name"
+              @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+            />
+          </div>
+          
+          <CollapsibleSection title="🔐 Pod 安全上下文">
+            <PodSecurityContextEditor 
+              v-model="localData.securityContext"
+              @update:modelValue="v => emitUpdate('securityContext', v)" 
+            />
+          </CollapsibleSection>
         
         <CollapsibleSection title="💾 Volumes">
           <VolumeEditor 
@@ -212,6 +258,8 @@
             v-model="localData.affinity"
             @update:modelValue="v => emitUpdate('affinity', v)" 
           />
+          </CollapsibleSection>
+          </CollapsibleSection>
         </CollapsibleSection>
       </template>
       
@@ -240,46 +288,77 @@
               />
             </div>
           </div>
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="💾 Volumes">
-          <VolumeEditor 
-            v-model="localData.volumes" 
-            @update:modelValue="v => emitUpdate('volumes', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
-          <ContainerEditor 
-            v-model="localData.initContainers" 
-            :volumes="localData.volumes"
-            :isInitContainer="true"
-            @update:modelValue="v => emitUpdate('initContainers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
-          <ContainerEditor 
-            v-model="localData.containers" 
-            :volumes="localData.volumes"
-            @update:modelValue="v => emitUpdate('containers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
-          <TolerationsEditor 
-            v-model="localData.tolerations"
-            @update:modelValue="v => emitUpdate('tolerations', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="📍 Affinity">
-          <AffinityEditor 
-            v-model="localData.affinity"
-            @update:modelValue="v => emitUpdate('affinity', v)" 
-          />
-        </CollapsibleSection>
+
+          
+          <CollapsibleSection title="Pod 模板配置 (Pod Template)" :defaultExpanded="true">
+            <div class="form-group">
+              <label class="form-label">ServiceAccount</label>
+              <input
+                type="text"
+                class="form-input"
+                v-model="localData.serviceAccountName"
+                @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
+                placeholder="default"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">ImagePullSecrets</label>
+              <ListEditor 
+                v-model="localData.imagePullSecrets"
+                placeholder="secret-name"
+                @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+              />
+            </div>
+            
+            <CollapsibleSection title="🔐 Pod 安全上下文">
+              <PodSecurityContextEditor 
+                v-model="localData.securityContext"
+                @update:modelValue="v => emitUpdate('securityContext', v)" 
+              />
+            </CollapsibleSection>
+          
+            <CollapsibleSection title="💾 Volumes">
+              <VolumeEditor 
+                v-model="localData.volumes" 
+                @update:modelValue="v => emitUpdate('volumes', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
+              <ContainerEditor 
+                v-model="localData.initContainers" 
+                :volumes="localData.volumes"
+                :isInitContainer="true"
+                @update:modelValue="v => emitUpdate('initContainers', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+              <ContainerEditor 
+                v-model="localData.containers" 
+                :volumes="localData.volumes"
+                @update:modelValue="v => emitUpdate('containers', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
+              <TolerationsEditor 
+                v-model="localData.tolerations"
+                @update:modelValue="v => emitUpdate('tolerations', v)" 
+              />
+            </CollapsibleSection>
+            
+            <CollapsibleSection title="📍 Affinity">
+              <AffinityEditor 
+                v-model="localData.affinity"
+                @update:modelValue="v => emitUpdate('affinity', v)" 
+              />
+            </CollapsibleSection>
+          </CollapsibleSection>
+          </CollapsibleSection>
       </template>
+
       
       <!-- Pod 特有属性 -->
       <template v-if="nodeType === 'pod'">
@@ -306,7 +385,23 @@
                 @input="emitUpdate('serviceAccountName', localData.serviceAccountName)"
               />
             </div>
+            
+            <div class="form-group">
+              <label class="form-label">ImagePullSecrets</label>
+              <ListEditor 
+                v-model="localData.imagePullSecrets"
+                placeholder="secret-name"
+                @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+              />
+            </div>
           </div>
+          
+          <CollapsibleSection title="🔐 Pod 安全上下文">
+            <PodSecurityContextEditor 
+              v-model="localData.securityContext"
+              @update:modelValue="v => emitUpdate('securityContext', v)" 
+            />
+          </CollapsibleSection>
           
           <div class="form-group">
             <label class="form-label">Node Selector</label>
@@ -591,44 +686,63 @@
               @input="emitUpdate('backoffLimit', localData.backoffLimit)"
             />
           </div>
+
         </CollapsibleSection>
         
-        <CollapsibleSection title="💾 Volumes">
-          <VolumeEditor 
-            v-model="localData.volumes" 
-            @update:modelValue="v => emitUpdate('volumes', v)" 
-          />
-        </CollapsibleSection>
+        <CollapsibleSection title="Pod 模板配置" :defaultExpanded="true">
+          <div class="form-group">
+            <label class="form-label">ImagePullSecrets</label>
+            <ListEditor 
+              v-model="localData.imagePullSecrets"
+              placeholder="secret-name"
+              @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+            />
+          </div>
+          
+          <CollapsibleSection title="🔐 Pod 安全上下文">
+            <PodSecurityContextEditor 
+              v-model="localData.securityContext"
+              @update:modelValue="v => emitUpdate('securityContext', v)" 
+            />
+          </CollapsibleSection>
         
-        <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
-          <ContainerEditor 
-            v-model="localData.initContainers" 
-            :volumes="localData.volumes"
-            :isInitContainer="true"
-            @update:modelValue="v => emitUpdate('initContainers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
-          <ContainerEditor 
-            v-model="localData.containers" 
-            :volumes="localData.volumes"
-            @update:modelValue="v => emitUpdate('containers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
-          <TolerationsEditor 
-            v-model="localData.tolerations"
-            @update:modelValue="v => emitUpdate('tolerations', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="📍 Affinity">
-          <AffinityEditor 
-            v-model="localData.affinity"
-            @update:modelValue="v => emitUpdate('affinity', v)" 
-          />
+          <CollapsibleSection title="💾 Volumes">
+            <VolumeEditor 
+              v-model="localData.volumes" 
+              @update:modelValue="v => emitUpdate('volumes', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
+            <ContainerEditor 
+              v-model="localData.initContainers" 
+              :volumes="localData.volumes"
+              :isInitContainer="true"
+              @update:modelValue="v => emitUpdate('initContainers', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+            <ContainerEditor 
+              v-model="localData.containers" 
+              :volumes="localData.volumes"
+              @update:modelValue="v => emitUpdate('containers', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
+            <TolerationsEditor 
+              v-model="localData.tolerations"
+              @update:modelValue="v => emitUpdate('tolerations', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="📍 Affinity">
+            <AffinityEditor 
+              v-model="localData.affinity"
+              @update:modelValue="v => emitUpdate('affinity', v)" 
+            />
+          </CollapsibleSection>
         </CollapsibleSection>
       </template>
       
@@ -672,42 +786,60 @@
           </div>
         </CollapsibleSection>
         
-        <CollapsibleSection title="💾 Volumes">
-          <VolumeEditor 
-            v-model="localData.volumes" 
-            @update:modelValue="v => emitUpdate('volumes', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
-          <ContainerEditor 
-            v-model="localData.initContainers" 
-            :volumes="localData.volumes"
-            :isInitContainer="true"
-            @update:modelValue="v => emitUpdate('initContainers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
-          <ContainerEditor 
-            v-model="localData.containers" 
-            :volumes="localData.volumes"
-            @update:modelValue="v => emitUpdate('containers', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
-          <TolerationsEditor 
-            v-model="localData.tolerations"
-            @update:modelValue="v => emitUpdate('tolerations', v)" 
-          />
-        </CollapsibleSection>
-        
-        <CollapsibleSection title="📍 Affinity">
-          <AffinityEditor 
-            v-model="localData.affinity"
-            @update:modelValue="v => emitUpdate('affinity', v)" 
-          />
+        <CollapsibleSection title="Pod 模板配置 (Pod Template)" :defaultExpanded="true">
+          <div class="form-group">
+            <label class="form-label">ImagePullSecrets</label>
+            <ListEditor 
+              v-model="localData.imagePullSecrets"
+              placeholder="secret-name"
+              @update:modelValue="v => emitUpdate('imagePullSecrets', v)" 
+            />
+          </div>
+          
+          <CollapsibleSection title="🔐 Pod 安全上下文">
+            <PodSecurityContextEditor 
+              v-model="localData.securityContext"
+              @update:modelValue="v => emitUpdate('securityContext', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="💾 Volumes">
+            <VolumeEditor 
+              v-model="localData.volumes" 
+              @update:modelValue="v => emitUpdate('volumes', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🚀 Init Containers" :badge="localData.initContainers?.length || 0">
+            <ContainerEditor 
+              v-model="localData.initContainers" 
+              :volumes="localData.volumes"
+              :isInitContainer="true"
+              @update:modelValue="v => emitUpdate('initContainers', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🐳 容器配置" :defaultExpanded="true">
+            <ContainerEditor 
+              v-model="localData.containers" 
+              :volumes="localData.volumes"
+              @update:modelValue="v => emitUpdate('containers', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="🎯 Tolerations" :badge="localData.tolerations?.length || 0">
+            <TolerationsEditor 
+              v-model="localData.tolerations"
+              @update:modelValue="v => emitUpdate('tolerations', v)" 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="📍 Affinity">
+            <AffinityEditor 
+              v-model="localData.affinity"
+              @update:modelValue="v => emitUpdate('affinity', v)" 
+            />
+          </CollapsibleSection>
         </CollapsibleSection>
       </template>
       
@@ -739,6 +871,8 @@ import IngressRuleEditor from './editors/IngressRuleEditor.vue'
 import LockedInput from './editors/LockedInput.vue'
 import TolerationsEditor from './editors/TolerationsEditor.vue'
 import AffinityEditor from './editors/AffinityEditor.vue'
+import PodSecurityContextEditor from './editors/PodSecurityContextEditor.vue'
+import ListEditor from './editors/ListEditor.vue'
 import { useFieldLocking, getEditMode } from '../composables/useFieldLocking'
 
 const props = defineProps({
@@ -840,6 +974,8 @@ function extractData(node) {
     dnsPolicy: podSpec.dnsPolicy || 'ClusterFirst',
     tolerations: podSpec.tolerations || [],
     affinity: podSpec.affinity || null,
+    securityContext: podSpec.securityContext || {},
+    imagePullSecrets: podSpec.imagePullSecrets || [],
     volumes: podSpec.volumes || [],
     initContainers: getInitContainers(),
     containers: getContainers(),

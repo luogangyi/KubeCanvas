@@ -784,3 +784,13 @@ metadata.name: 命名空间名称绝对不可改。
 ```
 资源下属的字段和关系，还不太正确，比如应该是如下关系Deployment->spec（DeploymentSpec）->template(PodTemplateSpec)->spec(PodSpec)->containers 。请重新梳理属性字段之间的关系，另外还有一些缺少的字段，比如initcontainer之类的
 ```
+
+# day 9 优化布局
+
+```
+当前如果保存了很多组合，将在页面上呈现一个很长的列表，请优化页面设计，以更好的形式呈现保存的组合
+```
+
+```
+根据docs/tasks/020-k8s-resource-field-restructure.md总结，再自己检查一遍资源属性编辑面板是否还有遗漏的字段没有在页面上程序，例如securityContext等。另外，containers下除了cpu、内存以外，要增加GPU作为可选配置
+```

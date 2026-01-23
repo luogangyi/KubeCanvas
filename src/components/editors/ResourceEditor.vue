@@ -50,6 +50,16 @@
               @input="emitChange"
             />
           </div>
+          <div class="resource-field">
+            <label class="resource-label">GPU (NVIDIA)</label>
+            <input
+              type="text"
+              class="form-input"
+              placeholder="1"
+              v-model="local.limits.gpu"
+              @input="emitChange"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -71,7 +81,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const local = ref({
   requests: { cpu: '', memory: '' },
-  limits: { cpu: '', memory: '' }
+  limits: { cpu: '', memory: '', gpu: '' }
 })
 
 watch(() => props.modelValue, (newVal) => {
@@ -82,7 +92,8 @@ watch(() => props.modelValue, (newVal) => {
     },
     limits: {
       cpu: newVal?.limits?.cpu || '',
-      memory: newVal?.limits?.memory || ''
+      memory: newVal?.limits?.memory || '',
+      gpu: newVal?.limits?.['nvidia.com/gpu'] || ''
     }
   }
 }, { immediate: true, deep: true })
@@ -98,6 +109,7 @@ function emitChange() {
   const limits = {}
   if (local.value.limits.cpu) limits.cpu = local.value.limits.cpu
   if (local.value.limits.memory) limits.memory = local.value.limits.memory
+  if (local.value.limits.gpu) limits['nvidia.com/gpu'] = local.value.limits.gpu
   if (Object.keys(limits).length > 0) result.limits = limits
   
   emit('update:modelValue', Object.keys(result).length > 0 ? result : undefined)
