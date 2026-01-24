@@ -1,0 +1,16 @@
+apiVersion: v2
+name: kubecanvas
+description: A Helm chart for KubeCanvas - Visual Kubernetes Resource Designer
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - kubernetes
+  - visual
+  - designer
+  - canvas
+home: https://github.com/luogangyi/KubeCanvas
+sources:
+  - https://github.com/luogangyi/KubeCanvas
+maintainers:
+  - name: Gangyi Luo

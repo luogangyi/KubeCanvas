@@ -1,0 +1,81 @@
+# ==================================
+# KubeCanvas Helm Chart Values
+# ==================================
+
+# 命名空间
+namespace: default
+
+# 副本数
+replicaCount: 1
+
+# 镜像配置
+image:
+  repository: registry.cn-hangzhou.aliyuncs.com/kubecanvas/kubecanvas
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service 配置
+service:
+  # 类型: NodePort | ClusterIP | LoadBalancer
+  type: NodePort
+  port: 80
+  # 仅当 type=NodePort 时生效
+  nodePort: 30073
+
+# Ingress 配置 (可选)
+ingress:
+  enabled: false
+  className: ""
+  host: kubecanvas.local
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls: []
+    # - hosts:
+    #     - kubecanvas.local
+    #   secretName: kubecanvas-tls
+
+# 资源配额
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+# ServiceAccount 配置
+serviceAccount:
+  # 是否创建 ServiceAccount
+  create: true
+  name: kubecanvas
+
+# RBAC 配置
+rbac:
+  # 是否创建 ClusterRole 和 ClusterRoleBinding
+  create: true
+
+# ConfigMap 配置
+config:
+  # K8s 默认命名空间
+  kubernetesNamespace: "default"
+  # UI 主题: light | dark
+  uiTheme: "light"
+
+# 健康检查配置
+probes:
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# 安全上下文
+securityContext:
+  runAsNonRoot: false
+  readOnlyRootFilesystem: false

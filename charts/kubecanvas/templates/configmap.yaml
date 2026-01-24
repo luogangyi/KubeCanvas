@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubecanvas.fullname" . }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kubecanvas.labels" . | nindent 4 }}
+data:
+  # K8s 默认命名空间
+  KUBERNETES_NAMESPACE: {{ .Values.config.kubernetesNamespace | quote }}
+  
+  # UI 主题: light | dark
+  UI_THEME: {{ .Values.config.uiTheme | quote }}
