@@ -236,34 +236,22 @@ export function useK8sApi() {
     }
 
     // 更新 compositions 注册表（添加或更新条目）
+    // 使用 "POST first, PUT on conflict" 策略，避免首次保存时产生 404 控制台错误
     async function updateCompositionsRegistry(compositionId, namespace, resourceCount = 0, name = '') {
         const client = await initApiClient()
-        const path = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps/${REGISTRY_CONFIGMAP_NAME}`
-
-        // 先读取现有数据
-        let registry = {}
-        let exists = false
-
-        try {
-            const response = await client.get(path)
-            exists = true
-            const data = response.data.data?.compositions
-            registry = data ? JSON.parse(data) : {}
-        } catch (error) {
-            if (error.response?.status !== 404) {
-                throw error
-            }
-        }
+        const basePath = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps`
+        const resourcePath = `${basePath}/${REGISTRY_CONFIGMAP_NAME}`
 
         // 添加/更新条目（包含自定义名称）
-        registry[compositionId] = {
+        const newEntry = {
             namespace,
             resourceCount,
             name: name || compositionId,
             updatedAt: new Date().toISOString()
         }
 
-        const configMap = {
+        // 尝试先创建 ConfigMap（适用于首次保存）
+        const newConfigMap = {
             apiVersion: 'v1',
             kind: 'ConfigMap',
             metadata: {
@@ -271,17 +259,35 @@ export function useK8sApi() {
                 namespace: REGISTRY_CONFIGMAP_NAMESPACE
             },
             data: {
-                compositions: JSON.stringify(registry)
+                compositions: JSON.stringify({ [compositionId]: newEntry })
             }
         }
 
-        if (exists) {
-            await client.put(path, configMap)
-        } else {
-            await client.post(`/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps`, configMap)
-        }
+        try {
+            // 尝试创建新的 ConfigMap
+            await client.post(basePath, newConfigMap)
+            return { [compositionId]: newEntry }
+        } catch (error) {
+            // 如果已存在 (409 Conflict)，则读取并更新
+            if (error.response?.status === 409) {
+                const response = await client.get(resourcePath)
+                const data = response.data.data?.compositions
+                const registry = data ? JSON.parse(data) : {}
 
-        return registry
+                registry[compositionId] = newEntry
+
+                const updatedConfigMap = {
+                    ...response.data,
+                    data: {
+                        compositions: JSON.stringify(registry)
+                    }
+                }
+
+                await client.put(resourcePath, updatedConfigMap)
+                return registry
+            }
+            throw error
+        }
     }
 
     // 从注册表中移除条目
