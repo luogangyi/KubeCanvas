@@ -236,7 +236,7 @@ export function useK8sApi() {
     }
 
     // 更新 compositions 注册表（添加或更新条目）
-    // 使用 "POST first, PUT on conflict" 策略，避免首次保存时产生 404 控制台错误
+    // 使用 "GET-then-PUT/POST" 策略，先检查是否存在
     async function updateCompositionsRegistry(compositionId, namespace, resourceCount = 0, name = '') {
         const client = await initApiClient()
         const basePath = `/api/v1/namespaces/${REGISTRY_CONFIGMAP_NAMESPACE}/configmaps`
@@ -250,43 +250,71 @@ export function useK8sApi() {
             updatedAt: new Date().toISOString()
         }
 
-        // 尝试先创建 ConfigMap（适用于首次保存）
-        const newConfigMap = {
-            apiVersion: 'v1',
-            kind: 'ConfigMap',
-            metadata: {
-                name: REGISTRY_CONFIGMAP_NAME,
-                namespace: REGISTRY_CONFIGMAP_NAMESPACE
-            },
-            data: {
-                compositions: JSON.stringify({ [compositionId]: newEntry })
+        // 先尝试获取现有 ConfigMap
+        let existingConfigMap = null
+        try {
+            const response = await client.get(resourcePath)
+            existingConfigMap = response.data
+        } catch (error) {
+            // 404 表示不存在，其他错误抛出
+            if (error.response?.status !== 404) {
+                throw error
             }
         }
 
-        try {
-            // 尝试创建新的 ConfigMap
-            await client.post(basePath, newConfigMap)
-            return { [compositionId]: newEntry }
-        } catch (error) {
-            // 如果已存在 (409 Conflict)，则读取并更新
-            if (error.response?.status === 409) {
-                const response = await client.get(resourcePath)
-                const data = response.data.data?.compositions
-                const registry = data ? JSON.parse(data) : {}
+        if (existingConfigMap) {
+            // ConfigMap 已存在，更新它
+            const data = existingConfigMap.data?.compositions
+            const registry = data ? JSON.parse(data) : {}
+            registry[compositionId] = newEntry
 
-                registry[compositionId] = newEntry
-
-                const updatedConfigMap = {
-                    ...response.data,
-                    data: {
-                        compositions: JSON.stringify(registry)
-                    }
+            const updatedConfigMap = {
+                ...existingConfigMap,
+                data: {
+                    compositions: JSON.stringify(registry)
                 }
-
-                await client.put(resourcePath, updatedConfigMap)
-                return registry
             }
-            throw error
+
+            await client.put(resourcePath, updatedConfigMap)
+            return registry
+        } else {
+            // ConfigMap 不存在，创建新的
+            const newConfigMap = {
+                apiVersion: 'v1',
+                kind: 'ConfigMap',
+                metadata: {
+                    name: REGISTRY_CONFIGMAP_NAME,
+                    namespace: REGISTRY_CONFIGMAP_NAMESPACE
+                },
+                data: {
+                    compositions: JSON.stringify({ [compositionId]: newEntry })
+                }
+            }
+
+            try {
+                await client.post(basePath, newConfigMap)
+                return { [compositionId]: newEntry }
+            } catch (error) {
+                // 处理并发创建导致的 409 冲突（极少发生）
+                if (error.response?.status === 409) {
+                    // 重试一次：获取并更新
+                    const response = await client.get(resourcePath)
+                    const data = response.data.data?.compositions
+                    const registry = data ? JSON.parse(data) : {}
+                    registry[compositionId] = newEntry
+
+                    const updatedConfigMap = {
+                        ...response.data,
+                        data: {
+                            compositions: JSON.stringify(registry)
+                        }
+                    }
+
+                    await client.put(resourcePath, updatedConfigMap)
+                    return registry
+                }
+                throw error
+            }
         }
     }
 
@@ -424,16 +452,19 @@ export function useK8sApi() {
     }
 
     // 获取所有资源组合列表（从 ConfigMap 注册表读取）
+    // 过滤掉 resourceCount 为 0 的空组合
     async function listCompositions() {
         const registry = await getCompositionsRegistry()
 
-        return Object.entries(registry).map(([id, info]) => ({
-            id,
-            name: info.name || id, // 使用自定义名称
-            namespace: info.namespace,
-            resourceCount: info.resourceCount || 0,
-            updatedAt: info.updatedAt
-        }))
+        return Object.entries(registry)
+            .filter(([id, info]) => (info.resourceCount || 0) > 0)  // 过滤空组合
+            .map(([id, info]) => ({
+                id,
+                name: info.name || id, // 使用自定义名称
+                namespace: info.namespace,
+                resourceCount: info.resourceCount || 0,
+                updatedAt: info.updatedAt
+            }))
     }
 
     // 更新资源

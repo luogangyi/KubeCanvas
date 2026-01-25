@@ -95,7 +95,7 @@ import CompositionLibrary from './components/CompositionLibrary.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
 
-const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, patchResource, deleteResource, deleteComposition } = useK8sApi()
+const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, removeFromRegistry, patchResource, deleteResource, deleteComposition } = useK8sApi()
 
 // 画布引用
 const canvasRef = ref(null)
@@ -597,7 +597,8 @@ async function handleIncrementalSave() {
   
   const currentResources = canvasRef.value.getAllResources(currentCompositionId.value)
   
-  if (currentResources.length === 0) {
+  // 允许画布为空的场景（删除所有资源），但需要有原始资源可删除
+  if (currentResources.length === 0 && originalResources.value.length === 0) {
     showToast('画布为空，请先添加资源', 'error')
     return
   }
@@ -710,22 +711,40 @@ async function handleIncrementalSave() {
     loadingProgress.value = 85
     
     if (errors.length === 0) {
-      // 更新注册表 - 使用 currentResources 的数量，它已经排除了被删除的资源
-      const firstResource = currentResources.find(r => r.metadata?.namespace)
-      const namespace = firstResource?.metadata?.namespace || 'default'
-      await updateCompositionsRegistry(currentCompositionId.value, namespace, currentResources.length, currentCompositionName.value)
-      
-      // 更新原始资源快照
-      originalResources.value = currentResources.map(r => JSON.parse(JSON.stringify(r)))
-      
-      loadingProgress.value = 100
-      loadingSuccess.value = true
-      // 生成友好的成功消息
-      const changes = []
-      if (toCreate.length > 0) changes.push(`创建 ${toCreate.length} 个`)
-      if (toPatch.length > 0) changes.push(`修改 ${toPatch.length} 个`)
-      if (toDelete.length > 0) changes.push(`删除 ${toDelete.length} 个`)
-      successMessage.value = `已更新！${changes.join('，')}资源`
+      // 检查是否所有资源都被删除了
+      console.log('[IncrementalSave] currentResources.length:', currentResources.length)
+      if (currentResources.length === 0) {
+        // 从注册表中完全移除该组合
+        console.log('[IncrementalSave] Removing composition from registry:', currentCompositionId.value)
+        await removeFromRegistry(currentCompositionId.value)
+        console.log('[IncrementalSave] Composition removed successfully')
+        
+        // 重置画布状态
+        currentCompositionId.value = generateCompositionLabel()
+        currentCompositionName.value = ''
+        originalResources.value = []
+        
+        loadingProgress.value = 100
+        loadingSuccess.value = true
+        successMessage.value = `已删除组合及其所有 ${toDelete.length} 个资源`
+      } else {
+        // 更新注册表 - 使用 currentResources 的数量
+        const firstResource = currentResources.find(r => r.metadata?.namespace)
+        const namespace = firstResource?.metadata?.namespace || 'default'
+        await updateCompositionsRegistry(currentCompositionId.value, namespace, currentResources.length, currentCompositionName.value)
+        
+        // 更新原始资源快照
+        originalResources.value = currentResources.map(r => JSON.parse(JSON.stringify(r)))
+        
+        loadingProgress.value = 100
+        loadingSuccess.value = true
+        // 生成友好的成功消息
+        const changes = []
+        if (toCreate.length > 0) changes.push(`创建 ${toCreate.length} 个`)
+        if (toPatch.length > 0) changes.push(`修改 ${toPatch.length} 个`)
+        if (toDelete.length > 0) changes.push(`删除 ${toDelete.length} 个`)
+        successMessage.value = `已更新！${changes.join('，')}资源`
+      }
       
       setTimeout(() => {
         loading.value = false
