@@ -44,6 +44,14 @@
       </template>
     </div>
     
+    <!-- 命名空间指示器 -->
+    <div v-if="props.defaultNamespace" class="namespace-indicator">
+      Namespace: <strong>{{ props.defaultNamespace }}</strong>
+      <button class="switch-ns-btn" @click="emit('switchNamespace')" title="切换命名空间">
+        🔄
+      </button>
+    </div>
+    
     <!-- 临时连线 SVG - 只在画笔工具模式下显示，handle 拖拽模式由 Vue Flow 原生绘制 -->
     <svg v-if="isConnecting && connectionSource && mousePosition && !isHandleDrag" class="temp-connection-line">
       <defs>
@@ -128,10 +136,15 @@ const props = defineProps({
   initialEdges: {
     type: Array,
     default: () => []
+  },
+  // 默认命名空间
+  defaultNamespace: {
+    type: String,
+    default: 'default'
   }
 })
 
-const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect', 'connectionError', 'deleteNode'])
+const emit = defineEmits(['nodeSelect', 'nodesChange', 'edgesChange', 'connect', 'connectionError', 'deleteNode', 'switchNamespace'])
 
 const vueFlowRef = ref(null)
 const { project, findNode, getNodes, getEdges, removeSelectedNodes, fitView } = useVueFlow()
@@ -587,7 +600,7 @@ function onDrop(event) {
   const nodeName = `${resource.type}-${nodeId.slice(0, 4)}`
   
   // 使用配置中的默认命名空间
-  const defaultNs = getDefaultNamespace()
+  const defaultNs = props.defaultNamespace // Use props.defaultNamespace
   
   // 检查是否落在某个 Namespace 容器内
   const containingNamespace = findContainingNamespace(x, y)
@@ -700,7 +713,7 @@ function onNodeDragStop(event) {
   }
   
   // 非 Namespace 节点：检查是否进入或离开 Namespace
-  const defaultNs = getDefaultNamespace()
+  const defaultNs = props.defaultNamespace // Use props.defaultNamespace
   const containingNamespace = findContainingNamespace(
     node.position.x + 50, // 使用节点中心点
     node.position.y + 30
@@ -1741,6 +1754,48 @@ defineExpose({
 
 .connection-status strong {
   color: #fde047;
+}
+
+.namespace-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  color: #374151;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  /* pointer-events: none; REMOVE THIS to allow button click */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.namespace-indicator strong {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.switch-ns-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.switch-ns-btn:hover {
+  background-color: #f3f4f6;
 }
 
 .cancel-hint {

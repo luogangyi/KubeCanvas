@@ -33,12 +33,14 @@
       :compositionId="currentCompositionId"
       :initialNodes="initialNodes"
       :initialEdges="initialEdges"
+      :defaultNamespace="currentNamespace"
       @nodeSelect="onNodeSelect"
       @nodesChange="onNodesChange"
       @edgesChange="onEdgesChange"
       @connect="onConnect"
       @connectionError="onConnectionError"
       @deleteNode="deleteSelectedNode"
+      @switchNamespace="handleSwitchNamespace"
     />
     
     <!-- 属性面板 -->
@@ -81,17 +83,24 @@
       :progress="loadingProgress"
       :isSuccess="loadingSuccess"
     />
+    
+    <!-- 命名空间选择器 -->
+    <NamespaceSelector
+      :visible="showNamespaceSelector"
+      @select="handleNamespaceSelection"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import Canvas from './components/Canvas.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import SaveDialog from './components/SaveDialog.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
 import CompositionLibrary from './components/CompositionLibrary.vue'
+import NamespaceSelector from './components/NamespaceSelector.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
 
@@ -111,6 +120,10 @@ const originalResources = ref([])
 
 // 已保存的资源组合列表
 const compositions = ref([])
+
+// 全局工作命名空间
+const currentNamespace = ref('')
+const showNamespaceSelector = ref(true) // 默认显示选择器
 
 // 选中的节点
 const selectedNode = ref(null)
@@ -878,9 +891,66 @@ function hasResourceChanged(original, current) {
     const originalData = JSON.stringify(original.data || original.stringData || {})
     const currentData = JSON.stringify(current.data || current.stringData || {})
     if (originalData !== currentData) return true
+      if (originalData !== currentData) return true
   }
   
   return false
+}
+
+// 加载资源组合列表
+Promise.all([
+  refreshCompositions(),
+  // 如果已有组合，我们暂时不强制弹窗，让用户选择加载。
+  // 如果没有组合，且没有选择命名空间，在 refreshCompositions 后会触发显示
+])
+
+// 监听 initialNodes 变化，如果是加载新组合，同步命名空间
+watch(() => initialNodes.value, (nodes) => {
+  if (nodes && nodes.length > 0) {
+    // 尝试从资源中获取命名空间
+    const firstResource = nodes.find(n => n.data?.resource?.metadata?.namespace)
+    const ns = firstResource?.data?.resource?.metadata?.namespace
+    if (ns && ns !== currentNamespace.value) {
+      currentNamespace.value = ns
+      console.log('[Namespace] Synced namespace from loaded composition:', ns)
+    }
+  }
+})
+
+// 处理命名空间选择
+function handleNamespaceSelection(namespace) {
+  currentNamespace.value = namespace
+  showNamespaceSelector.value = false
+  showToast(`当前工作命名空间: ${namespace}`)
+}
+
+// 切换命名空间（带数据检查）
+function handleSwitchNamespace() {
+  // 检查是否有未保存的更改
+  if (!canvasRef.value) {
+    showNamespaceSelector.value = true
+    return
+  }
+  
+  const currentResources = canvasRef.value.getAllResources(currentCompositionId.value)
+  
+  // 如果当前是新组合且有资源，提示未保存
+  if (!currentCompositionName.value && currentResources.length > 0) {
+     const confirmed = window.confirm('当前画布有未保存的资源，切换命名空间建议先清空画布或保存。\n\n是否忽略并强制切换？')
+     if (!confirmed) return
+  }
+  
+  // 如果是已保存的组合，检查差异
+  if (currentCompositionName.value) {
+    const { toCreate, toPatch, toDelete } = diffResources(originalResources.value, currentResources)
+    const isDirty = toCreate.length > 0 || toPatch.length > 0 || toDelete.length > 0
+    if (isDirty) {
+      const confirmed = window.confirm('当前组合有未保存的更改。\n\n是否忽略更改并强制切换？')
+      if (!confirmed) return
+    }
+  }
+  
+  showNamespaceSelector.value = true
 }
 
 // 刷新资源组合列表

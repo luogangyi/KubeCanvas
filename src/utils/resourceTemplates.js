@@ -532,14 +532,6 @@ export function createResourceTemplate(type, name, options = {}) {
 // 资源类型配置 - Namespace 放在最前面
 export const resourceTypes = [
     {
-        type: 'namespace',
-        name: 'Namespace',
-        description: '命名空间容器',
-        icon: 'ns',
-        color: '#6b7280',
-        category: 'namespace'
-    },
-    {
         type: 'deployment',
         name: 'Deployment',
         description: '无状态应用部署',

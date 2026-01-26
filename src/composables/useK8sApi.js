@@ -467,6 +467,19 @@ export function useK8sApi() {
             }))
     }
 
+    // 列出所有命名空间
+    async function listNamespaces() {
+        const client = await initApiClient()
+        const path = '/api/v1/namespaces'
+        try {
+            const response = await client.get(path)
+            return response.data.items.map(ns => ns.metadata.name)
+        } catch (error) {
+            console.error('Failed to list namespaces:', error)
+            throw error
+        }
+    }
+
     // 更新资源
     async function updateResource(resource) {
         const client = await initApiClient()
@@ -644,6 +657,7 @@ export function useK8sApi() {
         getCompositionsRegistry,
         updateCompositionsRegistry,
         removeFromRegistry,
+        listNamespaces,
         config: k8sConfig
     }
 }

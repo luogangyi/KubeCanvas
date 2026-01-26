@@ -798,3 +798,16 @@ metadata.name: 命名空间名称绝对不可改。
 ```
 修复2个问题：1）当恢复一个保存的组合，如果用按“backspace”按键删除所有资源组件，然后保存时，无法触发后端的删除操作，只会提示“画布为空，请先添加资源” 2）如果在资源组件上，右键点击，然后删除，则可以触发删除，但是控制台有报错
 ```
+
+# day 10 重构Namespace逻辑
+- 据说gemini前端更强，所以这里用gemini来做
+```
+Gemini：重构Namespace逻辑，左侧边栏取消Namespace组件。画布刷新的时候，首先让用户选择Namespace或者新建namespace。选择Namespace的时候应该从后端查询出所有Namespace，用户选中后，Namespace就不能更改了（除非刷新画布）。如果选择创建新的Namespace，则提示用户输入Namespace名称，点击保存后创建Namespace，如果创建失败，则回到创建Namespace的选项，如果创建成功，则Namespace就不能更改了（除非刷新画布），应该在画布比较明显的位置显示下Namespace的名称，避免用户忘记。Namespace确定以后，后面拖动到画布的组件都应该默认关联到这个Namespace下。Namespace不支持删除操作，如果用户想要删除Namespace，需要到K8s控制台中删除。
+```
+```
+测试创建新的ns成功，但是选择现有ns做不到，列表是空的.
+```
+
+```
+1）从已保存的组合恢复时，左上角显示的namespace名称没有变 2）在左上角namespace名称边上，增加一个切换Namespace的按钮，点击后，可以选择其他ns或者新建，也可以取消回到当前ns。如果选择确认切换，要判断ns中有没有组件没有保存，如果有未保存的组件，要弹出提示，请先保存或者清空。
+```
