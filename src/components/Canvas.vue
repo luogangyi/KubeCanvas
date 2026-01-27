@@ -52,6 +52,11 @@
       </button>
     </div>
     
+    <!-- 批量选择提示 -->
+    <div v-if="showSelectionHint" class="selection-hint">
+      ⌨️ 按住 Shift + 拖动鼠标批量选择 | Ctrl+A 全选 | ESC 取消
+    </div>
+    
     <!-- 临时连线 SVG - 只在画笔工具模式下显示，handle 拖拽模式由 Vue Flow 原生绘制 -->
     <svg v-if="isConnecting && connectionSource && mousePosition && !isHandleDrag" class="temp-connection-line">
       <defs>
@@ -79,6 +84,10 @@
       :default-edge-options="defaultEdgeOptions"
       :connect-on-click="false"
       :zoom-on-double-click="false"
+      :selection-key-code="'Shift'"
+      :multi-selection-key-code="['Shift', 'Meta', 'Control']"
+      :delete-key-code="'Delete'"
+      :pan-on-drag="[1, 2]"
       class="canvas"
       fit-view-on-init
       @nodes-change="onNodesChange"
@@ -158,6 +167,12 @@ const connectionCreated = ref(false) // 防止重复创建连线
 const sourceHandleId = ref(null) // 源连接点 ID
 const hoveredHandleId = ref(null) // 悬停的目标连接点 ID
 const showBrushTooltip = ref(false) // 画笔 tooltip 显示状态
+const showSelectionHint = ref(true) // 批量选择提示（初始显示一段时间后自动隐藏）
+
+// 5秒后自动隐藏批量选择提示
+setTimeout(() => {
+  showSelectionHint.value = false
+}, 5000)
 
 // 右键上下文菜单状态
 const contextMenu = ref({
@@ -365,9 +380,37 @@ function deleteContextEdge() {
 
 // 全局键盘监听
 function handleGlobalKeyDown(event) {
-  if (event.key === 'Escape' && isConnecting.value) {
-    cancelConnection()
+  // ESC 取消连线或取消选择
+  if (event.key === 'Escape') {
+    if (isConnecting.value) {
+      cancelConnection()
+    } else {
+      // 取消所有节点选择
+      deselectAllNodes()
+    }
   }
+  
+  // Ctrl+A / Cmd+A 全选
+  if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+    event.preventDefault()
+    selectAllNodes()
+  }
+}
+
+// 全选所有节点
+function selectAllNodes() {
+  nodes.value = nodes.value.map(node => ({
+    ...node,
+    selected: true
+  }))
+}
+
+// 取消所有节点选择
+function deselectAllNodes() {
+  nodes.value = nodes.value.map(node => ({
+    ...node,
+    selected: false
+  }))
 }
 
 onMounted(() => {
@@ -1754,6 +1797,29 @@ defineExpose({
 
 .connection-status strong {
   color: #fde047;
+}
+
+.selection-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  animation: fadeInOut 5s ease-in-out forwards;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .namespace-indicator {

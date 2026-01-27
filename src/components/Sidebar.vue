@@ -5,26 +5,6 @@
     </div>
     
     <div class="sidebar__content">
-      <!-- 命名空间（放在最前面）-->
-      <div class="section-title">命名空间</div>
-      <div class="resource-list">
-        <div
-          v-for="resource in namespaceResources"
-          :key="resource.type"
-          class="resource-card"
-          :class="`resource-card--${resource.type}`"
-          draggable="true"
-          @dragstart="onDragStart($event, resource)"
-          @mouseenter="showTooltip($event, resource.description)"
-          @mouseleave="hideTooltip"
-        >
-          <div class="resource-card__icon">
-            <img :src="getIconUrl(resource.icon)" :alt="resource.name" />
-          </div>
-          <div class="resource-card__name">{{ resource.name }}</div>
-        </div>
-      </div>
-      
       <!-- 工作负载 -->
       <div class="section-title">工作负载</div>
       <div class="resource-list">

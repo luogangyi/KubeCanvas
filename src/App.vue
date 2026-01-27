@@ -919,8 +919,25 @@ watch(() => initialNodes.value, (nodes) => {
 
 // 处理命名空间选择
 function handleNamespaceSelection(namespace) {
+  const previousNamespace = currentNamespace.value
   currentNamespace.value = namespace
   showNamespaceSelector.value = false
+  
+  // 如果命名空间发生变化且画布有内容，清空画布
+  if (previousNamespace && previousNamespace !== namespace && canvasRef.value) {
+    const nodes = canvasRef.value.getNodes()
+    if (nodes.length > 0) {
+      // 清空画布和重置状态
+      canvasRef.value.clearCanvas()
+      currentCompositionId.value = generateCompositionLabel()
+      currentCompositionName.value = ''
+      originalResources.value = []
+      selectedNode.value = null
+      showToast(`已切换到 ${namespace}，画布已清空`)
+      return
+    }
+  }
+  
   showToast(`当前工作命名空间: ${namespace}`)
 }
 
@@ -936,7 +953,7 @@ function handleSwitchNamespace() {
   
   // 如果当前是新组合且有资源，提示未保存
   if (!currentCompositionName.value && currentResources.length > 0) {
-     const confirmed = window.confirm('当前画布有未保存的资源，切换命名空间建议先清空画布或保存。\n\n是否忽略并强制切换？')
+     const confirmed = window.confirm('当前画布有未保存的资源，切换命名空间将清空画布。\n\n是否继续切换？')
      if (!confirmed) return
   }
   
@@ -945,7 +962,7 @@ function handleSwitchNamespace() {
     const { toCreate, toPatch, toDelete } = diffResources(originalResources.value, currentResources)
     const isDirty = toCreate.length > 0 || toPatch.length > 0 || toDelete.length > 0
     if (isDirty) {
-      const confirmed = window.confirm('当前组合有未保存的更改。\n\n是否忽略更改并强制切换？')
+      const confirmed = window.confirm('当前组合有未保存的更改，切换命名空间将清空画布。\n\n是否继续切换？')
       if (!confirmed) return
     }
   }
