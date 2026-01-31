@@ -47,7 +47,7 @@
 ## 🖥️ Screenshots
 
 <div align="center">
-<img src="docs/images/screenshot-new.png" alt="KubeCanvas Screenshot" width="800"/>
+<img src="docs/images/KubeCanvas2.png" alt="KubeCanvas Screenshot" width="800"/>
 </div>
 
 ## 🛠️ Tech Stack
@@ -100,6 +100,19 @@ kubectl apply -f deploy/03-service-nodeport.yaml
 ```
 
 > **Note**: Replace `<kubernetes-node-ip>` with your Kubernetes node IP (can be the API Server IP).
+
+### Install via Helm
+
+If you prefer using Helm:
+
+```bash
+# Clone the repository
+git clone https://github.com/luogangyi/KubeCanvas.git
+cd KubeCanvas
+
+# Install the chart
+helm install kubecanvas ./charts/kubecanvas --set service.type=NodePort --set service.nodePort=30073
+```
 
 ### Configuration
 

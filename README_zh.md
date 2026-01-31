@@ -47,7 +47,7 @@
 ## 🖥️ 界面截图
 
 <div align="center">
-<img src="docs/images/screenshot-new.png" alt="KubeCanvas 截图" width="800"/>
+<img src="docs/images/KubeCanvas2.png" alt="KubeCanvas 截图" width="800"/>
 </div>
 
 ## 🛠️ 技术栈
@@ -100,6 +100,19 @@ kubectl apply -f deploy/03-service-nodeport.yaml
 ```
 
 > **提示**：将 `<Kubernetes节点IP>` 替换为 Kubernetes 节点 IP（可以使用 API Server 的 IP 地址）。
+
+### 使用 Helm 安装
+
+如果您更喜欢使用 Helm：
+
+```bash
+# 克隆仓库
+git clone https://github.com/luogangyi/KubeCanvas.git
+cd KubeCanvas
+
+# 安装 Chart
+helm install kubecanvas ./charts/kubecanvas --set service.type=NodePort --set service.nodePort=30073
+```
 
 ### 配置
 

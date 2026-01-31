@@ -1,6 +1,6 @@
 # KubeCanvas Release v1.0.0
 
-**发布日期**: 2026-01-17
+**发布日期**: 2026-02-01
 
 ## 🎉 首个正式版本发布
 
@@ -27,6 +27,7 @@ KubeCanvas 是一款可视化的 Kubernetes 资源编排工具，通过拖拉拽
 - 增量保存更新
 - 从集群恢复组合
 - 统一标签管理
+- **Helm Chart 部署支持 ({new})**
 
 ---
 
@@ -40,6 +41,12 @@ kubectl apply -f deploy/02-deployment.yaml
 kubectl apply -f deploy/03-service-nodeport.yaml
 
 # 访问 http://<节点IP>:30073
+```
+
+### 使用 Helm 部署
+
+```bash
+helm install kubecanvas ./charts/kubecanvas --set service.type=NodePort --set service.nodePort=30073
 ```
 
 ### Docker 运行
@@ -59,6 +66,8 @@ docker run -p 8080:80 \
 - ✅ 默认主题改为亮色 (可通过 `VITE_UI_THEME` 配置)
 - ✅ ConfigMap 配置支持 (`deploy/04-configmap.yaml`)
 - ✅ NodePort Service 配置 (`deploy/03-service-nodeport.yaml`)
+- ✅ Helm Chart 部署支持 (`charts/kubecanvas`)
+- ✅ 优化容器编辑器布局 (资源配置默认展开，工作目录可折叠)
 - ✅ K8s API 请求日志记录 (`/var/log/nginx/k8s-api.log`)
 - ✅ README 中添加 K8s 快速部署说明
 
