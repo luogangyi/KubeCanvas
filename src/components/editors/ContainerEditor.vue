@@ -48,16 +48,33 @@
               </select>
             </div>
             <div class="form-group full-width">
-              <label class="form-label">工作目录</label>
+              <div 
+                class="field-toggle" 
+                @click="container.showWorkingDir = !container.showWorkingDir"
+              >
+                <span 
+                  class="toggle-arrow" 
+                  :class="{ expanded: container.showWorkingDir }"
+                >
+                  ▶
+                </span>
+                <label class="form-label pointer">工作目录</label>
+              </div>
               <input
+                v-if="container.showWorkingDir"
                 type="text"
-                class="form-input"
+                class="form-input mt-2"
                 placeholder="/app"
                 v-model="container.workingDir"
                 @input="emitChange"
               />
             </div>
           </div>
+        </CollapsibleSection>
+
+        <!-- 资源配置 -->
+        <CollapsibleSection title="资源配置" :defaultExpanded="true">
+          <ResourceEditor v-model="container.resources" @update:modelValue="emitChange" />
         </CollapsibleSection>
         
         <!-- 命令与参数 -->
@@ -80,11 +97,6 @@
         <!-- 环境变量 -->
         <CollapsibleSection title="环境变量" :badge="container.env?.length || 0">
           <EnvEditor v-model="container.env" @update:modelValue="emitChange" />
-        </CollapsibleSection>
-        
-        <!-- 资源配置 -->
-        <CollapsibleSection title="资源配置">
-          <ResourceEditor v-model="container.resources" @update:modelValue="emitChange" />
         </CollapsibleSection>
         
         <!-- 安全上下文 -->
@@ -189,6 +201,7 @@ const defaultContainer = () => ({
   image: '',
   imagePullPolicy: '',
   workingDir: '',
+  showWorkingDir: false,
   command: [],
   args: [],
   ports: [],
@@ -202,22 +215,29 @@ const defaultContainer = () => ({
 })
 
 watch(() => props.modelValue, (newVal) => {
-  localContainers.value = (newVal || []).map(c => ({
-    name: c.name || '',
-    image: c.image || '',
-    imagePullPolicy: c.imagePullPolicy || '',
-    workingDir: c.workingDir || '',
-    command: c.command || [],
-    args: c.args || [],
-    ports: c.ports || [],
-    env: c.env || [],
-    resources: c.resources || {},
-    securityContext: c.securityContext || {},
-    livenessProbe: c.livenessProbe || null,
-    readinessProbe: c.readinessProbe || null,
-    startupProbe: c.startupProbe || null,
-    volumeMounts: c.volumeMounts || []
-  }))
+  localContainers.value = (newVal || []).map((c, index) => {
+    // 尝试保持之前的 UI 状态
+    const oldContainer = localContainers.value[index]
+    const showWorkingDir = oldContainer ? oldContainer.showWorkingDir : !!c.workingDir
+
+    return {
+      name: c.name || '',
+      image: c.image || '',
+      imagePullPolicy: c.imagePullPolicy || '',
+      workingDir: c.workingDir || '',
+      showWorkingDir: showWorkingDir,
+      command: c.command || [],
+      args: c.args || [],
+      ports: c.ports || [],
+      env: c.env || [],
+      resources: c.resources || {},
+      securityContext: c.securityContext || {},
+      livenessProbe: c.livenessProbe || null,
+      readinessProbe: c.readinessProbe || null,
+      startupProbe: c.startupProbe || null,
+      volumeMounts: c.volumeMounts || []
+    }
+  })
   
   // 只对普通容器自动添加默认容器，initContainers 可以为空
   if (localContainers.value.length === 0 && !props.isInitContainer) {
@@ -320,6 +340,32 @@ function emitChange() {
 
 .form-group.full-width {
   grid-column: 1 / -1;
+}
+
+.field-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+.toggle-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.form-label.pointer {
+  cursor: pointer;
+}
+
+.mt-2 {
+  margin-top: 8px;
 }
 
 .probe-tabs {
