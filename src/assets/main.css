@@ -3,6 +3,7 @@
 
 /* ===== 字体导入 ===== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
 
 /* ===== 暗色主题 (默认) - Linear/Vercel Style ===== */
 :root,
@@ -14,11 +15,11 @@
   --bg-elevated: #171717;
   --bg-hover: #1a1a1a;
 
-  /* ===== Vercel 蓝强调色 ===== */
-  --accent-primary: #0070f3;
-  --accent-light: #3291ff;
+  /* ===== ECloud 蓝强调色 ===== */
+  --accent-primary: #337dff;
+  --accent-light: #5392ff;
   --accent-dim: #0a2540;
-  --accent-glow: rgba(0, 112, 243, 0.4);
+  --accent-glow: rgba(51, 125, 255, 0.4);
 
   /* ===== 文字颜色 (高对比度) ===== */
   --text-primary: #ededed;
@@ -99,11 +100,11 @@
   --bg-elevated: #ffffff;
   --bg-hover: #f0f0f0;
 
-  /* ===== Vercel 蓝强调色 ===== */
-  --accent-primary: #0070f3;
-  --accent-light: #3291ff;
+  /* ===== ECloud 蓝强调色 ===== */
+  --accent-primary: #337dff;
+  --accent-light: #5392ff;
   --accent-dim: #e6f0ff;
-  --accent-glow: rgba(0, 112, 243, 0.2);
+  --accent-glow: rgba(51, 125, 255, 0.2);
 
   /* ===== 文字颜色 ===== */
   --text-primary: #171717;
@@ -158,7 +159,7 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Noto Sans SC', 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
@@ -197,15 +198,15 @@ body {
   overflow: hidden;
 }
 
-/* ===== 头部 ===== */
+/* ===== 头部 (ECloud Style) ===== */
 .app-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: var(--header-height);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-default);
+  background: #262626;
+  border-bottom: none;
   display: flex;
   align-items: center;
   padding: 0 var(--space-4);
@@ -215,18 +216,31 @@ body {
 .app-header__logo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
+  color: #ffffff;
+  letter-spacing: 0;
 }
 
 .app-header__logo-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  height: 26px;
+  width: auto;
   object-fit: contain;
+}
+
+.app-header__logo-divider {
+  display: block;
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.app-header__logo-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.02em;
 }
 
 .app-header__actions {

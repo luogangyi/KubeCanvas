@@ -3,8 +3,9 @@
     <!-- 头部 -->
     <header class="app-header">
       <div class="app-header__logo">
-        <img src="./assets/icons/kubecanvas-logo-new.png" alt="KubeCanvas" class="app-header__logo-icon" />
-        <span>KubeCanvas</span>
+        <img src="./assets/icons/ecloud-logo.png" alt="移动云" class="app-header__logo-icon" />
+        <span class="app-header__logo-divider"></span>
+        <span class="app-header__logo-text">容器画布</span>
       </div>
       
       <div class="app-header__actions">
