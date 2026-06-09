@@ -644,10 +644,71 @@
               type="text"
               v-model="localData.storageClassName"
               :editability="fieldLocking.checkField('storageClassName')"
-              placeholder="留空使用默认"
+              placeholder="rootpv-local"
               @update:modelValue="v => emitUpdate('storageClassName', v)"
             />
           </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                v-model="localData.localPVEnabled"
+                :disabled="!fieldLocking.canEdit('volumeName')"
+                @change="emitUpdate('localPVEnabled', localData.localPVEnabled)"
+              />
+              使用本地 PV
+            </label>
+            <small v-if="!fieldLocking.canEdit('volumeName')" class="locked-hint">🔒 此字段不可变</small>
+          </div>
+
+          <template v-if="localData.localPVEnabled">
+            <div class="form-group">
+              <label class="form-label">节点 Hostname</label>
+              <LockedInput
+                type="text"
+                v-model="localData.localPVNode"
+                :editability="fieldLocking.checkField('volumeName')"
+                placeholder="留空自动选择"
+                @update:modelValue="v => emitUpdate('localPVNode', v)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">本地路径</label>
+              <LockedInput
+                type="text"
+                v-model="localData.localPVPath"
+                :editability="fieldLocking.checkField('volumeName')"
+                placeholder="/mnt/kubecanvas-localpv/default/data"
+                @update:modelValue="v => emitUpdate('localPVPath', v)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">PV 名称</label>
+              <LockedInput
+                type="text"
+                v-model="localData.localPVName"
+                :editability="fieldLocking.checkField('volumeName')"
+                placeholder="pv-default-data"
+                @update:modelValue="v => emitUpdate('localPVName', v)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">回收策略</label>
+              <select
+                class="form-select"
+                v-model="localData.localPVReclaimPolicy"
+                :disabled="!fieldLocking.canEdit('volumeName')"
+                @change="emitUpdate('localPVReclaimPolicy', localData.localPVReclaimPolicy)"
+              >
+                <option value="Delete">Delete</option>
+                <option value="Retain">Retain</option>
+              </select>
+            </div>
+          </template>
         </CollapsibleSection>
       </template>
       
@@ -874,6 +935,7 @@ import AffinityEditor from './editors/AffinityEditor.vue'
 import PodSecurityContextEditor from './editors/PodSecurityContextEditor.vue'
 import ListEditor from './editors/ListEditor.vue'
 import { useFieldLocking, getEditMode } from '../composables/useFieldLocking'
+import { getLocalPVConfig, isLocalPVClaim } from '../utils/localPvResources.js'
 
 const props = defineProps({
   selectedNode: {
@@ -928,6 +990,7 @@ function extractData(node) {
   const resource = node.data?.resource || {}
   const spec = resource.spec || {}
   const metadata = resource.metadata || {}
+  const localPVConfig = getLocalPVConfig(resource)
   
   // 获取容器配置
   const getContainers = () => {
@@ -1005,6 +1068,11 @@ function extractData(node) {
     storage: spec.resources?.requests?.storage || '1Gi',
     accessModes: spec.accessModes || ['ReadWriteOnce'],
     storageClassName: spec.storageClassName || '',
+    localPVEnabled: isLocalPVClaim(resource),
+    localPVNode: localPVConfig.nodeName,
+    localPVPath: localPVConfig.path,
+    localPVName: localPVConfig.pvName,
+    localPVReclaimPolicy: localPVConfig.reclaimPolicy,
     
     // Job
     completions: spec.completions || 1,
@@ -1193,5 +1261,4 @@ function updateTls() {
   color: #fbbf24 !important;
 }
 </style>
-
 

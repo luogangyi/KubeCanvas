@@ -159,6 +159,8 @@ function getApiPath(kind, namespace) {
     const paths = {
         // 集群级资源（不需要 namespace）
         Namespace: `/api/v1/namespaces`,
+        Node: `/api/v1/nodes`,
+        PersistentVolume: `/api/v1/persistentvolumes`,
         // 命名空间级资源
         Deployment: `/apis/apps/v1/namespaces/${namespace}/deployments`,
         DaemonSet: `/apis/apps/v1/namespaces/${namespace}/daemonsets`,
@@ -399,7 +401,7 @@ export function useK8sApi() {
         }
 
         const labelSelector = `kubecanvas.io/composition=${compositionId}`
-        const kinds = ['Namespace', 'Deployment', 'DaemonSet', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
+        const kinds = ['Namespace', 'PersistentVolume', 'Deployment', 'DaemonSet', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
 
         const allResources = []
 
@@ -454,6 +456,17 @@ export function useK8sApi() {
             return response.data.items.map(ns => ns.metadata.name)
         } catch (error) {
             console.error('Failed to list namespaces:', error)
+            throw error
+        }
+    }
+
+    async function listNodes() {
+        const client = await initApiClient()
+        try {
+            const response = await client.get('/api/v1/nodes')
+            return response.data.items || []
+        } catch (error) {
+            console.error('Failed to list nodes:', error)
             throw error
         }
     }
@@ -531,6 +544,9 @@ export function useK8sApi() {
                     resources: resource.spec?.resources
                 }
             }
+        } else if (kind === 'PersistentVolume') {
+            // PV 的 spec 基本不可变，编辑时只同步 metadata
+            patchData = {}
         } else if (kind === 'Ingress') {
             patchData = {
                 spec: resource.spec
@@ -593,9 +609,28 @@ export function useK8sApi() {
         const resources = await getCompositionResources(compositionId, ns)
         const errors = []
 
-        for (const resource of resources) {
+        const sortedResources = [...resources].sort((a, b) => {
+            const priority = {
+                Ingress: 0,
+                Service: 1,
+                Deployment: 2,
+                DaemonSet: 2,
+                StatefulSet: 2,
+                Pod: 2,
+                Job: 2,
+                CronJob: 2,
+                ConfigMap: 3,
+                Secret: 3,
+                PersistentVolumeClaim: 3,
+                PersistentVolume: 4,
+                Namespace: 5
+            }
+            return (priority[a.kind] ?? 6) - (priority[b.kind] ?? 6)
+        })
+
+        for (const resource of sortedResources) {
             try {
-                await deleteResource(resource.kind, resource.metadata.name, ns)
+                await deleteResource(resource.kind, resource.metadata.name, resource.metadata?.namespace || ns)
             } catch (error) {
                 errors.push({
                     resource: resource.metadata.name,
@@ -636,6 +671,7 @@ export function useK8sApi() {
         updateCompositionsRegistry,
         removeFromRegistry,
         listNamespaces,
+        listNodes,
         config: k8sConfig
     }
 }

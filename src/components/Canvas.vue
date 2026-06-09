@@ -133,6 +133,13 @@ import { createResourceTemplate, getResourceTypeConfig } from '../utils/resource
 import { getDefaultNamespace } from '../composables/useK8sApi.js'
 import { validateConnection } from '../utils/connectionRules.js'
 import { syncWorkloadIdentity } from '../utils/resourceRelationships.js'
+import {
+  LOCAL_PV_ANNOTATIONS,
+  LOCAL_PV_STORAGE_BACKEND,
+  getLocalPVConfig,
+  isLocalPVClaim,
+  withGeneratedLocalPVResources
+} from '../utils/localPvResources.js'
 
 const props = defineProps({
   compositionId: {
@@ -1280,12 +1287,51 @@ function updateNodeData(nodeId, field, value) {
     }
     return null
   }
+
+  const ensureAnnotations = () => {
+    if (!resource.metadata.annotations) resource.metadata.annotations = {}
+    return resource.metadata.annotations
+  }
+
+  const setAnnotation = (key, value) => {
+    const annotations = ensureAnnotations()
+    if (value === undefined || value === null || value === '') {
+      delete annotations[key]
+    } else {
+      annotations[key] = String(value)
+    }
+    if (Object.keys(annotations).length === 0) {
+      delete resource.metadata.annotations
+    }
+  }
+
+  const enableLocalPV = () => {
+    const annotations = ensureAnnotations()
+    annotations[LOCAL_PV_ANNOTATIONS.storageBackend] = LOCAL_PV_STORAGE_BACKEND
+    const config = getLocalPVConfig(resource)
+    annotations[LOCAL_PV_ANNOTATIONS.name] = config.pvName
+    annotations[LOCAL_PV_ANNOTATIONS.path] = config.path
+    annotations[LOCAL_PV_ANNOTATIONS.reclaimPolicy] = config.reclaimPolicy
+    if (config.nodeName) annotations[LOCAL_PV_ANNOTATIONS.node] = config.nodeName
+    resource.spec.storageClassName = config.storageClassName
+    resource.spec.volumeName = config.pvName
+  }
   
   switch (field) {
     // === 元数据 ===
     case 'name':
       node.data.name = value
       syncWorkloadIdentity(resource, value)
+      if (resource.kind === 'PersistentVolumeClaim' && isLocalPVClaim(resource)) {
+        const annotations = ensureAnnotations()
+        if (!annotations[LOCAL_PV_ANNOTATIONS.name]) {
+          annotations[LOCAL_PV_ANNOTATIONS.name] = `pv-${resource.metadata?.namespace || 'default'}-${value}`
+          resource.spec.volumeName = annotations[LOCAL_PV_ANNOTATIONS.name]
+        }
+        if (!annotations[LOCAL_PV_ANNOTATIONS.path]) {
+          annotations[LOCAL_PV_ANNOTATIONS.path] = `/mnt/kubecanvas-localpv/${resource.metadata?.namespace || 'default'}/${value}`
+        }
+      }
       break
       
     case 'namespace':
@@ -1437,7 +1483,41 @@ function updateNodeData(nodeId, field, value) {
       break
       
     case 'storageClassName':
-      resource.spec.storageClassName = value || undefined
+      resource.spec.storageClassName = isLocalPVClaim(resource) ? (value ?? '') : value || undefined
+      break
+
+    case 'localPVEnabled':
+      if (value) {
+        enableLocalPV()
+      } else {
+        setAnnotation(LOCAL_PV_ANNOTATIONS.storageBackend, '')
+        setAnnotation(LOCAL_PV_ANNOTATIONS.node, '')
+        setAnnotation(LOCAL_PV_ANNOTATIONS.path, '')
+        setAnnotation(LOCAL_PV_ANNOTATIONS.name, '')
+        setAnnotation(LOCAL_PV_ANNOTATIONS.reclaimPolicy, '')
+        delete resource.spec.volumeName
+      }
+      break
+
+    case 'localPVNode':
+      enableLocalPV()
+      setAnnotation(LOCAL_PV_ANNOTATIONS.node, value)
+      break
+
+    case 'localPVPath':
+      enableLocalPV()
+      setAnnotation(LOCAL_PV_ANNOTATIONS.path, value)
+      break
+
+    case 'localPVName':
+      enableLocalPV()
+      setAnnotation(LOCAL_PV_ANNOTATIONS.name, value)
+      resource.spec.volumeName = value || undefined
+      break
+
+    case 'localPVReclaimPolicy':
+      enableLocalPV()
+      setAnnotation(LOCAL_PV_ANNOTATIONS.reclaimPolicy, value || 'Delete')
       break
     
     // === Job 配置 ===
@@ -1532,7 +1612,7 @@ function deleteNode(nodeId) {
 
 // 获取所有资源
 function getAllResources(compositionId) {
-  return nodes.value.map(node => {
+  const resources = nodes.value.map(node => {
     const resource = JSON.parse(JSON.stringify(node.data.resource))
     if (!resource.metadata.labels) {
       resource.metadata.labels = {}
@@ -1641,6 +1721,8 @@ function getAllResources(compositionId) {
     
     return resource
   })
+
+  return withGeneratedLocalPVResources(resources)
 }
 
 // 获取原始资源（不清理容器，用于验证）
