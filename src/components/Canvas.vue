@@ -132,6 +132,7 @@ import NamespaceNode from './nodes/NamespaceNode.vue'
 import { createResourceTemplate, getResourceTypeConfig } from '../utils/resourceTemplates.js'
 import { getDefaultNamespace } from '../composables/useK8sApi.js'
 import { validateConnection } from '../utils/connectionRules.js'
+import { syncWorkloadIdentity } from '../utils/resourceRelationships.js'
 
 const props = defineProps({
   compositionId: {
@@ -1284,10 +1285,7 @@ function updateNodeData(nodeId, field, value) {
     // === 元数据 ===
     case 'name':
       node.data.name = value
-      resource.metadata.name = value
-      // 同步更新 app 标签
-      if (!resource.metadata.labels) resource.metadata.labels = {}
-      resource.metadata.labels.app = value
+      syncWorkloadIdentity(resource, value)
       break
       
     case 'namespace':
@@ -1296,6 +1294,9 @@ function updateNodeData(nodeId, field, value) {
       
     case 'labels':
       resource.metadata.labels = { ...value }
+      if (value?.app) {
+        syncWorkloadIdentity(resource, value.app, { updateName: false })
+      }
       break
       
     case 'annotations':

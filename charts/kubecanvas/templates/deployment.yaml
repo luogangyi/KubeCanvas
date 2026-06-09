@@ -17,6 +17,10 @@ spec:
         {{- include "kubecanvas.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "kubecanvas.serviceAccountName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       
       containers:
         - name: kubecanvas

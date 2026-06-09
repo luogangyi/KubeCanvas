@@ -33,8 +33,8 @@
     "docker:run": "docker run -p 8080:80 --rm kubecanvas:latest",
     "docker:push": "docker push kubecanvas:latest",
     "docker:compose": "docker-compose up --build",
-    "k8s:deploy": "kubectl apply -f deploy/",
-    "k8s:delete": "kubectl delete -f deploy/",
+    "k8s:deploy": "kubectl apply -f deploy/01-rbac.yaml && kubectl apply -f deploy/02-deployment.yaml && kubectl apply -f deploy/03-service.yaml",
+    "k8s:delete": "kubectl delete -f deploy/03-service-nodeport.yaml --ignore-not-found=true; kubectl delete -f deploy/03-service.yaml --ignore-not-found=true; kubectl delete -f deploy/02-deployment.yaml --ignore-not-found=true; kubectl delete -f deploy/01-rbac.yaml --ignore-not-found=true",
     "k8s:logs": "kubectl logs -f -l app=kubecanvas"
   },
   "dependencies": {

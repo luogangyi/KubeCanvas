@@ -40,7 +40,7 @@ export function getDefaultNamespace() {
 
 /**
  * 检测是否在 K8s Pod 内运行
- * 通过检查环境变量和 ServiceAccount 挂载目录判断
+ * 浏览器无法读取 Pod 环境变量，这里只在非浏览器运行时用于调试信息。
  */
 function isRunningInCluster() {
     // 检查 K8s 环境变量
@@ -66,30 +66,8 @@ async function getInClusterConfig() {
         }
     }
 
-    // 如果是 SSR 或 Node.js 环境，从文件系统读取
-    if (typeof process !== 'undefined' && process.env?.KUBERNETES_SERVICE_HOST) {
-        const fs = await import('fs').catch(() => null)
-        if (fs) {
-            const host = process.env.KUBERNETES_SERVICE_HOST
-            const port = process.env.KUBERNETES_SERVICE_PORT || '443'
-            const tokenPath = k8sConfig.inCluster.tokenPath
-            const namespacePath = k8sConfig.inCluster.namespacePath
-
-            try {
-                const tokenContent = fs.readFileSync(tokenPath, 'utf-8').trim()
-                const namespaceContent = fs.readFileSync(namespacePath, 'utf-8').trim()
-
-                return {
-                    apiServer: `https://${host}:${port}`,
-                    token: tokenContent,
-                    namespace: namespaceContent
-                }
-            } catch (err) {
-                console.error('Failed to read in-cluster credentials:', err.message)
-            }
-        }
-    }
-
+    // 生产环境是静态前端，ServiceAccount token 由 docker-entrypoint.sh
+    // 写入 Nginx 代理配置并覆盖 /k8s-api 请求头，浏览器代码不读取本地文件。
     return null
 }
 
@@ -421,7 +399,7 @@ export function useK8sApi() {
         }
 
         const labelSelector = `kubecanvas.io/composition=${compositionId}`
-        const kinds = ['Namespace', 'Deployment', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
+        const kinds = ['Namespace', 'Deployment', 'DaemonSet', 'StatefulSet', 'Service', 'Pod', 'Ingress', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'Job', 'CronJob']
 
         const allResources = []
 

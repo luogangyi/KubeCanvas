@@ -90,16 +90,17 @@ For quick deployment to an existing Kubernetes cluster:
 git clone https://github.com/luogangyi/KubeCanvas.git
 cd KubeCanvas
 
-# Deploy RBAC, Deployment, and NodePort Service
+# Deploy RBAC, Deployment, and internal Service
 kubectl apply -f deploy/01-rbac.yaml
 kubectl apply -f deploy/02-deployment.yaml
-kubectl apply -f deploy/03-service-nodeport.yaml
+kubectl apply -f deploy/03-service.yaml
 
-# Access the application
-# http://<kubernetes-node-ip>:30073
+# Access the application through a local tunnel
+kubectl port-forward svc/kubecanvas 8080:80 -n default
+# http://localhost:8080
 ```
 
-> **Note**: Replace `<kubernetes-node-ip>` with your Kubernetes node IP (can be the API Server IP).
+> **Security note**: KubeCanvas proxies Kubernetes API calls with its ServiceAccount. Do not expose it with NodePort/LoadBalancer/Ingress unless you put authentication and network controls in front of it.
 
 ### Install via Helm
 
@@ -111,7 +112,10 @@ git clone https://github.com/luogangyi/KubeCanvas.git
 cd KubeCanvas
 
 # Install the chart
-helm install kubecanvas ./charts/kubecanvas --set service.type=NodePort --set service.nodePort=30073
+helm install kubecanvas ./charts/kubecanvas
+
+# Access through a local tunnel
+kubectl port-forward svc/kubecanvas 8080:80 -n default
 ```
 
 ### Configuration

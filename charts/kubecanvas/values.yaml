@@ -8,6 +8,9 @@ namespace: default
 # 副本数
 replicaCount: 1
 
+# 节点选择器（默认不限制调度）
+nodeSelector: {}
+
 # 镜像配置
 image:
   repository: registry.cn-hangzhou.aliyuncs.com/kubecanvas/kubecanvas
@@ -17,7 +20,7 @@ image:
 # Service 配置
 service:
   # 类型: NodePort | ClusterIP | LoadBalancer
-  type: NodePort
+  type: ClusterIP
   port: 80
   # 仅当 type=NodePort 时生效
   nodePort: 30073
