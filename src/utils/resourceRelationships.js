@@ -1,5 +1,6 @@
 const SELECTOR_WORKLOAD_KINDS = new Set(['Deployment', 'StatefulSet', 'DaemonSet'])
 const TEMPLATE_WORKLOAD_KINDS = new Set(['Deployment', 'StatefulSet', 'DaemonSet', 'Job'])
+const SERVICE_WORKLOAD_NODE_TYPES = new Set(['deployment', 'statefulset', 'daemonset', 'pod'])
 
 function ensureMetadata(resource) {
     if (!resource.metadata) resource.metadata = {}
@@ -76,4 +77,44 @@ export function syncWorkloadIdentity(resource, appLabel, options = {}) {
     metadata.labels.app = appLabel
     syncMutableSelector(resource, appLabel)
     syncMutablePodTemplateLabels(resource, appLabel)
+}
+
+export function getWorkloadServiceSelectorApp(resource, fallbackName = '') {
+    if (!resource) return fallbackName
+
+    if (resource.kind === 'Pod') {
+        return resource.metadata?.labels?.app || fallbackName
+    }
+
+    return resource.spec?.template?.metadata?.labels?.app ||
+        resource.spec?.selector?.matchLabels?.app ||
+        resource.metadata?.labels?.app ||
+        fallbackName
+}
+
+export function syncServiceSelectorToWorkload(serviceResource, workloadResource, fallbackName = '') {
+    if (!serviceResource?.spec) return
+
+    const appLabel = getWorkloadServiceSelectorApp(workloadResource, fallbackName)
+    if (!appLabel) return
+
+    serviceResource.spec.selector = { app: appLabel }
+}
+
+export function syncConnectedServiceSelectors(nodes, edges, workloadNode) {
+    if (!SERVICE_WORKLOAD_NODE_TYPES.has(workloadNode?.type)) return
+
+    const connectedServiceIds = edges
+        .filter(edge => edge.source === workloadNode.id || edge.target === workloadNode.id)
+        .map(edge => edge.source === workloadNode.id ? edge.target : edge.source)
+
+    nodes
+        .filter(node => node.type === 'service' && connectedServiceIds.includes(node.id))
+        .forEach(serviceNode => {
+            syncServiceSelectorToWorkload(
+                serviceNode.data?.resource,
+                workloadNode.data?.resource,
+                workloadNode.data?.name
+            )
+        })
 }
