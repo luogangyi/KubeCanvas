@@ -132,7 +132,11 @@ import NamespaceNode from './nodes/NamespaceNode.vue'
 import { createResourceTemplate, getResourceTypeConfig } from '../utils/resourceTemplates.js'
 import { getDefaultNamespace } from '../composables/useK8sApi.js'
 import { validateConnection } from '../utils/connectionRules.js'
-import { syncWorkloadIdentity } from '../utils/resourceRelationships.js'
+import {
+  syncConnectedServiceSelectors,
+  syncServiceSelectorToWorkload,
+  syncWorkloadIdentity
+} from '../utils/resourceRelationships.js'
 import {
   LOCAL_PV_ANNOTATIONS,
   LOCAL_PV_STORAGE_BACKEND,
@@ -851,15 +855,11 @@ function createConnection(sourceNode, targetNode, explicitSourceHandle = null, e
   }
   
   if (serviceNodeConn && workloadNodeConn) {
-    const targetAppLabel = workloadNodeConn.data.resource.metadata?.labels?.app ||
-                          workloadNodeConn.data.resource.spec?.selector?.matchLabels?.app ||
-                          workloadNodeConn.data.name
-    
-    if (serviceNodeConn.data.resource.spec) {
-      serviceNodeConn.data.resource.spec.selector = {
-        app: targetAppLabel
-      }
-    }
+    syncServiceSelectorToWorkload(
+      serviceNodeConn.data.resource,
+      workloadNodeConn.data.resource,
+      workloadNodeConn.data.name
+    )
   }
   
   // 如果是 Ingress ↔ Service 连接 (支持双向)
@@ -1322,6 +1322,7 @@ function updateNodeData(nodeId, field, value) {
     case 'name':
       node.data.name = value
       syncWorkloadIdentity(resource, value)
+      syncConnectedServiceSelectors(nodes.value, edges.value, node)
       if (resource.kind === 'PersistentVolumeClaim' && isLocalPVClaim(resource)) {
         const annotations = ensureAnnotations()
         if (!annotations[LOCAL_PV_ANNOTATIONS.name]) {
@@ -1342,6 +1343,7 @@ function updateNodeData(nodeId, field, value) {
       resource.metadata.labels = { ...value }
       if (value?.app) {
         syncWorkloadIdentity(resource, value.app, { updateName: false })
+        syncConnectedServiceSelectors(nodes.value, edges.value, node)
       }
       break
       
