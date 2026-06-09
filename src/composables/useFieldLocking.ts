@@ -63,6 +63,12 @@ export const FIELD_PATH_MAPPING: Record<string, Record<string, string>> = {
         storage: 'spec.resources.requests.storage',
         accessModes: 'spec.accessModes',
         storageClassName: 'spec.storageClassName',
+        volumeName: 'spec.volumeName',
+        localPVEnabled: 'spec.volumeName',
+        localPVNode: 'spec.volumeName',
+        localPVPath: 'spec.volumeName',
+        localPVName: 'spec.volumeName',
+        localPVReclaimPolicy: 'spec.volumeName',
     },
 
     // ConfigMap

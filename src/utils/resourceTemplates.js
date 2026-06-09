@@ -1,5 +1,6 @@
 // K8s 资源模板生成器
 import { v4 as uuidv4 } from 'uuid'
+import { LOCAL_PV_ANNOTATIONS, LOCAL_PV_STORAGE_BACKEND } from './localPvResources.js'
 
 // 生成资源组合标签
 export function generateCompositionLabel() {
@@ -361,12 +362,27 @@ export function createSecretTemplate(name, options = {}) {
 // PVC 模板
 export function createPVCTemplate(name, options = {}) {
     const {
-        storageClassName = '',
+        storageClassName = 'rootpv-local',
         accessModes = ['ReadWriteOnce'],
         storage = '1Gi',
         labels = {},
-        namespace = 'default'
+        namespace = 'default',
+        localPVEnabled = true,
+        localPVNode = '',
+        localPVPath = `/mnt/kubecanvas-localpv/${namespace}/${name}`,
+        localPVName = `pv-${namespace}-${name}`,
+        localPVReclaimPolicy = 'Delete'
     } = options
+
+    const annotations = localPVEnabled
+        ? {
+            [LOCAL_PV_ANNOTATIONS.storageBackend]: LOCAL_PV_STORAGE_BACKEND,
+            [LOCAL_PV_ANNOTATIONS.path]: localPVPath,
+            [LOCAL_PV_ANNOTATIONS.name]: localPVName,
+            [LOCAL_PV_ANNOTATIONS.reclaimPolicy]: localPVReclaimPolicy,
+            ...(localPVNode && { [LOCAL_PV_ANNOTATIONS.node]: localPVNode })
+        }
+        : undefined
 
     return {
         apiVersion: 'v1',
@@ -377,10 +393,12 @@ export function createPVCTemplate(name, options = {}) {
             labels: {
                 app: name,
                 ...labels
-            }
+            },
+            ...(annotations && { annotations })
         },
         spec: {
-            storageClassName: storageClassName || undefined,
+            storageClassName: localPVEnabled ? storageClassName : storageClassName || undefined,
+            ...(localPVEnabled && { volumeName: localPVName }),
             accessModes,
             resources: {
                 requests: {

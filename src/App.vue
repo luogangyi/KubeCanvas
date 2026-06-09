@@ -104,8 +104,16 @@ import NamespaceSelector from './components/NamespaceSelector.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
 import { createSavedCompositionState } from './utils/compositionState.js'
+import {
+  getLocalPVConfig,
+  isGeneratedLocalPersistentVolume,
+  isLocalPVClaim,
+  sortResourcesForCreate,
+  sortResourcesForDelete,
+  withGeneratedLocalPVResources
+} from './utils/localPvResources.js'
 
-const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, removeFromRegistry, patchResource, deleteResource, deleteComposition } = useK8sApi()
+const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, removeFromRegistry, patchResource, deleteResource, deleteComposition, listNodes } = useK8sApi()
 
 // 画布引用
 const canvasRef = ref(null)
@@ -496,6 +504,43 @@ function getVolumes(resource) {
   return []
 }
 
+function isReadyNode(node) {
+  return node.status?.conditions?.some(condition =>
+    condition.type === 'Ready' && condition.status === 'True'
+  )
+}
+
+async function getFallbackLocalPVNodeName(resources) {
+  const needsNode = resources.some(resource =>
+    isLocalPVClaim(resource) && !getLocalPVConfig(resource).nodeName
+  )
+  if (!needsNode) return ''
+
+  try {
+    const nodes = await listNodes()
+    const readyNode = nodes.find(isReadyNode) || nodes[0]
+    return readyNode?.metadata?.name || ''
+  } catch (error) {
+    console.warn('Failed to list nodes for local PV fallback:', error)
+    return ''
+  }
+}
+
+async function prepareResourcesForSave(resources) {
+  const fallbackNodeName = await getFallbackLocalPVNodeName(resources)
+  const preparedResources = withGeneratedLocalPVResources(resources, { fallbackNodeName })
+
+  const invalidLocalPVCs = preparedResources.filter(resource =>
+    isLocalPVClaim(resource) && !getLocalPVConfig(resource).nodeName
+  )
+  if (invalidLocalPVCs.length > 0) {
+    const names = invalidLocalPVCs.map(resource => resource.metadata?.name).join(', ')
+    throw new Error(`PVC (${names}) 已启用本地 PV，但没有可用节点 Hostname`)
+  }
+
+  return preparedResources
+}
+
 // 清空画布
 function clearCanvas() {
   if (canvasRef.value) {
@@ -525,7 +570,13 @@ async function handleSaveConfirm(compositionName) {
   
   if (!canvasRef.value) return
   
-  const resources = canvasRef.value.getAllResources(currentCompositionId.value)
+  let resources
+  try {
+    resources = await prepareResourcesForSave(canvasRef.value.getAllResources(currentCompositionId.value))
+  } catch (error) {
+    showToast(`保存失败: ${error.message}`, 'error')
+    return
+  }
   
   if (resources.length === 0) {
     showToast('画布为空，请先添加资源', 'error')
@@ -561,11 +612,7 @@ async function handleSaveConfirm(compositionName) {
   saving.value = true
   
   // 对资源排序：Namespace 必须先创建
-  const sortedResources = [...resources].sort((a, b) => {
-    if (a.kind === 'Namespace' && b.kind !== 'Namespace') return -1
-    if (a.kind !== 'Namespace' && b.kind === 'Namespace') return 1
-    return 0
-  })
+  const sortedResources = sortResourcesForCreate(resources)
   
   console.log('Creating resources in order:', sortedResources.map(r => `${r.kind}/${r.metadata?.name}`))
   
@@ -612,7 +659,13 @@ async function handleSaveConfirm(compositionName) {
 async function handleIncrementalSave() {
   if (!canvasRef.value) return
   
-  const currentResources = canvasRef.value.getAllResources(currentCompositionId.value)
+  let currentResources
+  try {
+    currentResources = await prepareResourcesForSave(canvasRef.value.getAllResources(currentCompositionId.value))
+  } catch (error) {
+    showToast(`保存失败: ${error.message}`, 'error')
+    return
+  }
   
   // 允许画布为空的场景（删除所有资源），但需要有原始资源可删除
   if (currentResources.length === 0 && originalResources.value.length === 0) {
@@ -660,11 +713,7 @@ async function handleIncrementalSave() {
     const errors = []
     
     // 1. 创建新资源（Namespace 优先）
-    const sortedToCreate = [...toCreate].sort((a, b) => {
-      if (a.kind === 'Namespace' && b.kind !== 'Namespace') return -1
-      if (a.kind !== 'Namespace' && b.kind === 'Namespace') return 1
-      return 0
-    })
+    const sortedToCreate = sortResourcesForCreate(toCreate)
     
     loadingProgress.value = 30
     
@@ -699,11 +748,7 @@ async function handleIncrementalSave() {
     loadingProgress.value = 70
     
     // 3. 删除被移除的资源（Namespace 最后删除）
-    const sortedToDelete = [...toDelete].sort((a, b) => {
-      if (a.kind === 'Namespace' && b.kind !== 'Namespace') return 1
-      if (a.kind !== 'Namespace' && b.kind === 'Namespace') return -1
-      return 0
-    })
+    const sortedToDelete = sortResourcesForDelete(toDelete)
     
     for (const resource of sortedToDelete) {
       try {
@@ -884,6 +929,16 @@ function diffResources(original, current) {
 
 // 检查资源是否已修改（比较 spec）
 function hasResourceChanged(original, current) {
+  const originalMetadata = JSON.stringify({
+    labels: original.metadata?.labels || {},
+    annotations: original.metadata?.annotations || {}
+  })
+  const currentMetadata = JSON.stringify({
+    labels: current.metadata?.labels || {},
+    annotations: current.metadata?.annotations || {}
+  })
+  if (originalMetadata !== currentMetadata) return true
+
   // 比较 spec 部分（忽略 metadata 中的 resourceVersion 等）
   const originalSpec = JSON.stringify(original.spec || {})
   const currentSpec = JSON.stringify(current.spec || {})
@@ -1026,8 +1081,9 @@ async function loadComposition(compositionId) {
   try {
     loadingProgress.value = 40
     const resources = await getCompositionResources(compositionId)
+    const visualResources = resources.filter(resource => !isGeneratedLocalPersistentVolume(resource))
     
-    if (resources.length === 0) {
+    if (visualResources.length === 0) {
       loading.value = false
       showToast('未找到资源', 'error')
       return
@@ -1037,8 +1093,8 @@ async function loadComposition(compositionId) {
     console.log('Loaded resources from K8s:', resources)
     
     // 先分离 Namespace 节点和其他资源
-    const namespaceResources = resources.filter(r => r.kind === 'Namespace')
-    const otherResources = resources.filter(r => r.kind !== 'Namespace')
+    const namespaceResources = visualResources.filter(r => r.kind === 'Namespace')
+    const otherResources = visualResources.filter(r => r.kind !== 'Namespace')
     
     // 按层级分类资源（从上到下：Ingress → Service → Workloads → Pod → Storage）
     const layerConfig = [

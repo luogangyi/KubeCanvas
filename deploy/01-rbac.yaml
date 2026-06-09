@@ -31,7 +31,14 @@ rules:
       - configmaps
       - secrets
       - persistentvolumeclaims
+      - persistentvolumes
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Node 只用于为本地 PV 自动选择 Ready 节点
+  - apiGroups: [""]
+    resources:
+      - nodes
+    verbs: ["get", "list", "watch"]
   
   # Apps API 资源
   - apiGroups: ["apps"]
