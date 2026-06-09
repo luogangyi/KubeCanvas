@@ -90,16 +90,17 @@ npm run dev
 git clone https://github.com/luogangyi/KubeCanvas.git
 cd KubeCanvas
 
-# 部署 RBAC、Deployment 和 NodePort Service
+# 部署 RBAC、Deployment 和集群内部 Service
 kubectl apply -f deploy/01-rbac.yaml
 kubectl apply -f deploy/02-deployment.yaml
-kubectl apply -f deploy/03-service-nodeport.yaml
+kubectl apply -f deploy/03-service.yaml
 
-# 访问应用
-# http://<Kubernetes节点IP>:30073
+# 通过本地隧道访问应用
+kubectl port-forward svc/kubecanvas 8080:80 -n default
+# http://localhost:8080
 ```
 
-> **提示**：将 `<Kubernetes节点IP>` 替换为 Kubernetes 节点 IP（可以使用 API Server 的 IP 地址）。
+> **安全提示**：KubeCanvas 会使用自身 ServiceAccount 代理 Kubernetes API 请求。不要直接通过 NodePort、LoadBalancer 或 Ingress 暴露，除非前面已经加了认证和网络访问控制。
 
 ### 使用 Helm 安装
 
@@ -111,7 +112,10 @@ git clone https://github.com/luogangyi/KubeCanvas.git
 cd KubeCanvas
 
 # 安装 Chart
-helm install kubecanvas ./charts/kubecanvas --set service.type=NodePort --set service.nodePort=30073
+helm install kubecanvas ./charts/kubecanvas
+
+# 通过本地隧道访问
+kubectl port-forward svc/kubecanvas 8080:80 -n default
 ```
 
 ### 配置

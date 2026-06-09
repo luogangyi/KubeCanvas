@@ -103,6 +103,7 @@ import CompositionLibrary from './components/CompositionLibrary.vue'
 import NamespaceSelector from './components/NamespaceSelector.vue'
 import { useK8sApi } from './composables/useK8sApi.js'
 import { generateCompositionLabel } from './utils/resourceTemplates.js'
+import { createSavedCompositionState } from './utils/compositionState.js'
 
 const { createResource, createResources, listCompositions, getCompositionResources, updateCompositionsRegistry, removeFromRegistry, patchResource, deleteResource, deleteComposition } = useK8sApi()
 
@@ -254,7 +255,7 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
           for (let i = 0; i < childNodes.length; i++) {
             const childNode = childNodes[i]
             const childResource = childNode.data?.resource
-            if (childResource?.metadata?.resourceVersion) {
+            if (childResource?.kind && childResource?.metadata?.name) {
               try {
                 await deleteResource(childResource.kind, childResource.metadata.name, childResource.metadata.namespace)
                 console.log(`Deleted child resource: ${childResource.kind}/${childResource.metadata.name}`)
@@ -271,7 +272,7 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
           
           // 再删除 Namespace
           const nsResource = nsNode.data?.resource
-          if (nsResource?.metadata?.resourceVersion) {
+          if (nsResource?.kind && nsResource?.metadata?.name) {
             try {
               await deleteResource(nsResource.kind, nsResource.metadata.name)
               console.log(`Deleted namespace: ${nsResource.metadata.name}`)
@@ -307,7 +308,7 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
       // 没有子资源，只删除 Namespace
       if (currentCompositionName.value) {
         const nsResource = nsNode.data?.resource
-        if (nsResource?.metadata?.resourceVersion) {
+        if (nsResource?.kind && nsResource?.metadata?.name) {
           try {
             loading.value = true
             loadingMessage.value = '删除 Namespace 中...'
@@ -358,11 +359,11 @@ async function deleteSelectedNode(nodeFromContextMenu = null) {
     resourceName: resource?.metadata?.name,
     resourceVersion: resource?.metadata?.resourceVersion,
     resourceNamespace: resource?.metadata?.namespace,
-    conditionMet: !!(currentCompositionName.value && resource?.metadata?.resourceVersion)
+    conditionMet: !!(currentCompositionName.value && resource?.kind && resource?.metadata?.name)
   })
   
-  // 如果是已保存的资源（有 resourceVersion），从 K8s 删除
-  if (currentCompositionName.value && resource?.metadata?.resourceVersion) {
+  // 如果是已保存的组合，从 K8s 删除
+  if (currentCompositionName.value && resource?.kind && resource?.metadata?.name) {
     try {
       loading.value = true
       loadingMessage.value = '删除资源中...'
@@ -579,6 +580,9 @@ async function handleSaveConfirm(compositionName) {
       const firstResource = sortedResources.find(r => r.metadata?.namespace)
       const namespace = firstResource?.metadata?.namespace || 'default'
       await updateCompositionsRegistry(currentCompositionId.value, namespace, results.length, compositionName)
+      const savedState = createSavedCompositionState(compositionName, sortedResources)
+      currentCompositionName.value = savedState.currentCompositionName
+      originalResources.value = savedState.originalResources
       
       loadingProgress.value = 100
       loadingSuccess.value = true
@@ -991,6 +995,7 @@ async function handleDeleteComposition(compositionId, namespace) {
       console.warn('Partial delete errors:', errors)
       showToast(`删除了 ${deleted} 个资源，但有 ${errors.length} 个失败`, 'warning')
     } else {
+      await removeFromRegistry(compositionId)
       showToast('资源组合已删除', 'success')
       
       // 如果删除的是当前加载的组合，清空画布

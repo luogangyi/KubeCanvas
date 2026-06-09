@@ -4,13 +4,19 @@ Visual Kubernetes Resource Designer - 可视化 Kubernetes 资源设计器
 
 ## 安装
 
-### 默认安装 (NodePort)
+### 默认安装 (ClusterIP)
 
 ```bash
 helm install kubecanvas ./charts/kubecanvas
 ```
 
-访问地址: `http://<NodeIP>:30073`
+```bash
+kubectl port-forward svc/kubecanvas 8080:80 -n default
+```
+
+访问地址: `http://localhost:8080`
+
+> 安全提示: KubeCanvas 会用自身 ServiceAccount 代理 Kubernetes API 请求。不要直接暴露 NodePort、LoadBalancer 或 Ingress，除非前面已有认证和网络访问控制。
 
 ### ClusterIP + Ingress 安装
 
@@ -27,10 +33,11 @@ helm install kubecanvas ./charts/kubecanvas \
 |------|------|--------|
 | `namespace` | 部署命名空间 | `default` |
 | `replicaCount` | 副本数 | `1` |
+| `nodeSelector` | Pod 节点选择器 | `{}` |
 | `image.repository` | 镜像仓库 | `registry.cn-hangzhou.aliyuncs.com/kubecanvas/kubecanvas` |
 | `image.tag` | 镜像标签 | `latest` |
 | `image.pullPolicy` | 拉取策略 | `IfNotPresent` |
-| `service.type` | Service 类型 | `NodePort` |
+| `service.type` | Service 类型 | `ClusterIP` |
 | `service.port` | Service 端口 | `80` |
 | `service.nodePort` | NodePort 端口 | `30073` |
 | `ingress.enabled` | 是否启用 Ingress | `false` |
